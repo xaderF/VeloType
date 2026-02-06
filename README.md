@@ -1,73 +1,62 @@
-# Welcome to your Lovable project
+# VeloType
 
-## Project info
+VeloType is a competitive typing game focused on speed, accuracy, and skill-based progression.  
+The project is designed as a structured, extensible frontend application that supports ranked competitive modes and real-time interaction.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## Overview
 
-There are several ways of editing your application.
+VeloType is built as a modern web application to explore competitive typing mechanics beyond traditional typing tests. Instead of focusing solely on raw speed, the system emphasizes accuracy, consistency, and relative performance between players.
 
-**Use Lovable**
+The project is structured to support ranked 1v1 gameplay, scalable game modes, and future real-time features while maintaining clean component boundaries and predictable state management.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## Core Concepts
 
-**Use your preferred IDE**
+- Skill-based typing evaluation (speed, accuracy, consistency)
+- Competitive scoring based on relative performance
+- Ranked progression using ELO-style matchmaking
+- Deterministic text generation for fair matches
+- Extensible game-mode architecture
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Features
 
-Follow these steps:
+- Multi-page frontend architecture
+- Modular React component design
+- Deterministic typing rounds with shared text seeds
+- Performance-focused typing engine
+- Responsive layout for desktop and tablet
+- Clean separation between UI, game logic, and scoring logic
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Tech Stack
 
-# Step 3: Install the necessary dependencies.
-npm i
+| Category    | Tools |
+|------------|-------|
+| Frontend   | React, JavaScript (ES6+), HTML5, CSS3 |
+| Styling    | Tailwind CSS |
+| Tooling    | Vite, npm |
+| Deployment | Vercel |
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
+## Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```text
+root
+├── public
+├── src
+│   ├── components     # Reusable UI components
+│   ├── pages          # Route-level pages
+│   ├── game           # Typing logic, scoring, and match rules
+│   ├── assets         # Static assets
+│   ├── styles         # Global and utility styles
+│   └── main.jsx       # Application entry point
+├── package.json
+├── vite.config.js
+└── README.md
