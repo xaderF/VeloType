@@ -89,7 +89,7 @@ A multi-player competitive mode built on the same core scoring system.
 
 ## Project Structure
 
-```text
+```
 root
 ├── public
 ├── src
@@ -102,3 +102,50 @@ root
 ├── package.json
 ├── vite.config.ts
 └── README.md
+```
+---
+
+## Roadmap
+
+The following roadmap outlines planned milestones for VeloType.  
+Features are implemented incrementally, with an emphasis on correctness, fairness, and scalability.
+
+### Phase 1 — Core Foundation (In Progress)
+- [x] Deterministic typing engine
+- [x] Strongly typed game logic using TypeScript
+- [x] Modular frontend architecture
+- [ ] Repository structure cleanup and tooling polish
+- [ ] Environment configuration standardization
+
+### Phase 2 — Persistence & Accounts
+- [ ] Backend API setup
+- [ ] Database integration (users, profiles, matches)
+- [ ] Authentication (OAuth or email-based)
+- [ ] User profiles with persisted settings
+- [ ] Match history storage and retrieval
+
+### Phase 3 — Competitive Systems
+- [ ] Ranked matchmaking queue
+- [ ] Server-side ELO rating system
+- [ ] Rank tiers and progression visualization
+- [ ] Daily seeded leaderboards
+- [ ] Anti-abuse and validation checks
+
+### Phase 4 — Real-Time Multiplayer
+- [ ] WebSocket-based match infrastructure
+- [ ] Server-authoritative 1v1 match flow
+- [ ] Reconnect handling and match recovery
+- [ ] Latency and performance optimization
+
+### Phase 5 — Expanded Game Modes
+- [ ] Battle Royale typing mode
+- [ ] Multi-round elimination mechanics
+- [ ] Player targeting and interaction systems
+- [ ] Spectator-friendly UI elements
+
+### Phase 6 — Production Readiness
+- [ ] Monitoring and logging
+- [ ] Rate limiting and abuse prevention
+- [ ] Accessibility and UX refinements
+- [ ] Performance profiling and optimization
+- [ ] Legal and privacy documentation
