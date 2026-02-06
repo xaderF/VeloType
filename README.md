@@ -78,7 +78,7 @@ A multi-player competitive mode built on the same scoring system.
 
 | Category    | Tools |
 |------------|-------|
-| Frontend   | React, JavaScript (ES6+), HTML5, CSS3 |
+| Frontend   | React, TypeScript, HTML5, CSS3 |
 | Styling    | Tailwind CSS |
 | Tooling    | Vite, npm |
 | Deployment | Vercel |
