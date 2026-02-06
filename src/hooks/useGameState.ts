@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GamePhase, Player, RoundResult, MatchState } from '@/types/game';
-import { RoundStats, calculateScore, calculateDamage, calculateEloChange, getRankFromRating } from '@/utils/scoring';
+import { RoundStats, calculateEloChange, getRankFromRating } from '@/utils/scoring';
+import { performanceScore, damageFromScores } from '@/game/match';
 import { getSeededText, generateMatchSeed } from '@/utils/textSeed';
 
 // Simulated opponent names
@@ -30,6 +31,8 @@ export function useGameState({
   const [match, setMatch] = useState<MatchState | null>(null);
   const [roundStats, setRoundStats] = useState<RoundStats | null>(null);
   const [playerRating, setPlayerRating] = useState(initialRating);
+  const [drawOffered, setDrawOffered] = useState(false);
+  const [drawAccepted, setDrawAccepted] = useState(false);
   
   const queueTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -78,13 +81,16 @@ export function useGameState({
         player: { ...player, hp: 100, maxHp: 100 },
         opponent,
         currentRound: 1,
-        maxRounds: 3,
+        maxRounds: 15,
         roundResults: [],
         roundTimeSeconds: 30,
         status: 'waiting',
         winner: null,
         textSeed: seed,
       });
+
+      setDrawOffered(false);
+      setDrawAccepted(false);
 
       setPhase('match_found');
 
@@ -126,23 +132,25 @@ export function useGameState({
 
   // Simulate opponent stats (they perform based on their rating)
   const simulateOpponentStats = useCallback((baseWpm: number = 60): RoundStats => {
-    if (!match) {
-      return { wpm: baseWpm, accuracy: 95, errors: 2, charactersTyped: 100, correctCharacters: 95 };
-    }
-    
-    // Opponent performance based on rating difference
-    const ratingFactor = match.opponent.rating / 1200;
-    const wpm = Math.round(baseWpm * ratingFactor * (0.9 + Math.random() * 0.2));
-    const accuracy = Math.min(99, Math.round(90 + Math.random() * 8));
-    const errors = Math.max(0, Math.round((100 - accuracy) * 2));
-    const chars = Math.round(wpm * 0.5 * 5); // 30 seconds worth
-    
+    const elapsedMinutes = match ? match.roundTimeSeconds / 60 : 0.5;
+    const ratingFactor = match ? match.opponent.rating / 1200 : 1;
+
+    const wpm = Math.max(20, Math.round(baseWpm * ratingFactor * (0.9 + Math.random() * 0.2)));
+    const accuracy = Math.min(0.99, Math.max(0.8, 0.9 + (Math.random() - 0.5) * 0.1));
+    const consistency = Math.min(1, Math.max(0, 0.75 + (Math.random() - 0.5) * 0.15));
+    const correctCharacters = Math.round(wpm * 5 * elapsedMinutes);
+    const charactersTyped = Math.max(correctCharacters, Math.round(correctCharacters / Math.max(accuracy, 0.0001)));
+    const errors = Math.max(0, charactersTyped - correctCharacters);
+    const rawWpm = (charactersTyped / 5) / elapsedMinutes;
+
     return {
       wpm,
+      rawWpm,
       accuracy,
+      consistency,
       errors,
-      charactersTyped: chars,
-      correctCharacters: Math.round(chars * accuracy / 100),
+      charactersTyped,
+      correctCharacters,
     };
   }, [match]);
 
@@ -156,8 +164,8 @@ export function useGameState({
     const opponentStats = simulateOpponentStats(playerStats.wpm);
     
     // Calculate scores
-    const playerScore = calculateScore(playerStats.wpm, playerStats.accuracy);
-    const opponentScore = calculateScore(opponentStats.wpm, opponentStats.accuracy);
+    const playerScore = performanceScore(playerStats);
+    const opponentScore = performanceScore(opponentStats);
     
     // Determine winner and damage
     let winner: 'player' | 'opponent' | 'draw' = 'draw';
@@ -166,16 +174,18 @@ export function useGameState({
     
     if (playerScore > opponentScore) {
       winner = 'player';
-      damageDealt = calculateDamage(playerScore, opponentScore);
+      damageDealt = damageFromScores(playerScore, opponentScore);
     } else if (opponentScore > playerScore) {
       winner = 'opponent';
-      damageTaken = calculateDamage(opponentScore, playerScore);
+      damageTaken = damageFromScores(opponentScore, playerScore);
     }
 
     const roundResult: RoundResult = {
       roundNumber: match.currentRound,
       playerStats,
       opponentStats,
+      playerScore,
+      opponentScore,
       winner,
       damageDealt,
       damageTaken,
@@ -187,24 +197,25 @@ export function useGameState({
     
     // Check for match end
     const roundResults = [...match.roundResults, roundResult];
-    const playerWins = roundResults.filter(r => r.winner === 'player').length;
-    const opponentWins = roundResults.filter(r => r.winner === 'opponent').length;
-    
-    const matchEnded = 
-      newPlayerHp <= 0 || 
-      newOpponentHp <= 0 || 
-      playerWins >= 2 || 
-      opponentWins >= 2 ||
-      match.currentRound >= match.maxRounds;
+    const maxRounds = match.maxRounds || 15;
+    const tieAvailable = roundResults.length >= 10;
 
-    const matchWinner = 
-      newPlayerHp <= 0 ? 'opponent' :
-      newOpponentHp <= 0 ? 'player' :
-      playerWins >= 2 ? 'player' :
-      opponentWins >= 2 ? 'opponent' :
-      playerWins > opponentWins ? 'player' :
-      opponentWins > playerWins ? 'opponent' :
-      null;
+    const matchEnded =
+      newPlayerHp <= 0 ||
+      newOpponentHp <= 0 ||
+      roundResults.length >= maxRounds ||
+      (tieAvailable && drawAccepted);
+
+    let matchWinner: 'player' | 'opponent' | 'draw' | null = null;
+    if (newPlayerHp <= 0) matchWinner = 'opponent';
+    else if (newOpponentHp <= 0) matchWinner = 'player';
+    else if (roundResults.length >= maxRounds) {
+      if (newPlayerHp > newOpponentHp) matchWinner = 'player';
+      else if (newOpponentHp > newPlayerHp) matchWinner = 'opponent';
+      else matchWinner = 'draw';
+    } else if (tieAvailable && drawAccepted) {
+      matchWinner = 'draw';
+    }
 
     setMatch((prev) => {
       if (!prev) return null;
@@ -224,29 +235,62 @@ export function useGameState({
     // If match ended, calculate ELO and go to results
     if (matchEnded) {
       setTimeout(() => {
-        if (matchWinner) {
+        if (matchWinner !== null) {
+          const result: 'win' | 'loss' | 'draw' = matchWinner === 'draw' ? 'draw' : matchWinner === 'player' ? 'win' : 'loss';
           const eloChange = calculateEloChange(
             playerRating,
             match.opponent.rating,
-            matchWinner === 'player'
+            result
           );
           setPlayerRating((prev) => prev + eloChange);
         }
         setPhase('results');
       }, 3000);
     } else {
-      // Continue to next round after a delay
+      // 15s break between rounds, then normal countdown
+      const breakMs = 15000;
       setTimeout(() => {
         setPhase('countdown');
         setCountdown(3);
-      }, 3000);
+      }, breakMs);
     }
-  }, [match, playerRating, simulateOpponentStats]);
+  }, [match, playerRating, simulateOpponentStats, drawAccepted]);
+
+  // Offer draw after round 10; simulate opponent acceptance
+  const offerDraw = useCallback(() => {
+    if (!match || match.currentRound < 10 || match.status === 'match_end') return;
+    setDrawOffered(true);
+    // Simulate opponent confirming draw shortly after
+    setTimeout(() => {
+      setDrawAccepted(true);
+      setMatch((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          status: 'match_end',
+          winner: 'draw',
+        };
+      });
+      setPhase('round_end');
+      setTimeout(() => {
+        const eloChange = calculateEloChange(
+          playerRating,
+          match.opponent.rating,
+          'draw'
+        );
+        setPlayerRating((prev) => prev + eloChange);
+        setPhase('results');
+      }, 2000);
+    }, 800);
+  }, [match, playerRating]);
 
   // Get current round text
   const getCurrentText = useCallback((): string => {
     if (!match) return '';
-    return getSeededText(match.textSeed + match.currentRound);
+    return getSeededText(`${match.textSeed}-${match.currentRound}`, {
+      length: Math.max(200, match.roundTimeSeconds * 8),
+      difficulty: 'medium',
+    });
   }, [match]);
 
   // Play again
@@ -267,11 +311,8 @@ export function useGameState({
   // Calculate ELO change for display
   const getEloChange = useCallback(() => {
     if (!match || !match.winner) return 0;
-    return calculateEloChange(
-      playerRating - (match.winner === 'player' ? calculateEloChange(playerRating, match.opponent.rating, true) : calculateEloChange(playerRating, match.opponent.rating, false)),
-      match.opponent.rating,
-      match.winner === 'player'
-    );
+    const result: 'win' | 'loss' | 'draw' = match.winner === 'draw' ? 'draw' : match.winner === 'player' ? 'win' : 'loss';
+    return calculateEloChange(playerRating, match.opponent.rating, result);
   }, [match, playerRating]);
 
   return {
@@ -285,8 +326,11 @@ export function useGameState({
     startQueue,
     cancelQueue,
     handleRoundComplete,
+    offerDraw,
     getCurrentText,
     playAgain,
     getEloChange,
+    drawOffered,
+    drawAccepted,
   };
 }

@@ -12,62 +12,61 @@
 
 @layer base {
   :root {
-    /* Core dark theme - deep blacks with subtle blue undertones */
-    --background: 220 20% 4%;
-    --foreground: 210 20% 95%;
+    /* Minimal, muted dark palette inspired by Monkeytype */
+    --background: 220 10% 14%; /* neutral grey */
+    --foreground: 45 8% 88%;
 
-    --card: 220 20% 6%;
-    --card-foreground: 210 20% 95%;
+    --card: 210 10% 10%;
+    --card-foreground: 45 8% 88%;
 
-    --popover: 220 20% 8%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 210 10% 12%;
+    --popover-foreground: 45 8% 88%;
 
-    /* Electric cyan primary - the competitive edge */
-    --primary: 185 100% 50%;
-    --primary-foreground: 220 20% 4%;
+    /* Accent light blue for modern look */
+    --primary: 210 100% 70%; /* light blue */
+    --primary-foreground: 210 10% 6%;
 
-    /* Muted grays for secondary elements */
-    --secondary: 220 15% 12%;
-    --secondary-foreground: 210 15% 70%;
+    --secondary: 210 8% 16%;
+    --secondary-foreground: 45 8% 80%;
 
-    --muted: 220 15% 15%;
-    --muted-foreground: 210 10% 50%;
+    --muted: 210 6% 20%;
+    --muted-foreground: 45 6% 65%;
 
-    --accent: 185 80% 40%;
-    --accent-foreground: 210 20% 95%;
+    --accent: 210 100% 70%; /* light blue */
+    --accent-foreground: 210 10% 6%;
 
-    --destructive: 0 85% 55%;
-    --destructive-foreground: 210 20% 95%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 45 10% 95%;
 
-    --border: 220 15% 15%;
-    --input: 220 15% 12%;
-    --ring: 185 100% 50%;
+    --border: 210 8% 18%;
+    --input: 210 8% 16%;
+    --ring: 45 85% 55%;
 
     --radius: 0.5rem;
 
-    /* Rank colors - gaming aesthetic */
-    --rank-bronze: 30 60% 45%;
-    --rank-silver: 220 10% 65%;
-    --rank-gold: 45 90% 55%;
-    --rank-platinum: 185 50% 60%;
-    --rank-diamond: 270 80% 65%;
+    /* Rank colors - slightly desaturated to match minimalist vibe */
+    --rank-bronze: 30 45% 45%;
+    --rank-silver: 220 8% 65%;
+    --rank-gold: 45 80% 55%;
+    --rank-platinum: 185 40% 55%;
+    --rank-diamond: 260 60% 60%;
 
     /* Game-specific colors */
-    --hp-full: 145 70% 45%;
-    --hp-mid: 45 90% 55%;
-    --hp-low: 0 85% 55%;
-    --damage: 0 85% 55%;
+    --hp-full: 145 45% 45%;
+    --hp-mid: 45 80% 55%;
+    --hp-low: 0 72% 55%;
+    --damage: 0 72% 55%;
     
     /* Typing colors */
-    --typing-correct: 185 100% 50%;
-    --typing-error: 0 85% 55%;
-    --typing-current: 185 100% 50%;
-    --typing-pending: 210 10% 35%;
+    --typing-correct: 45 85% 55%;
+    --typing-error: 0 72% 55%;
+    --typing-current: 45 85% 70%;
+    --typing-pending: 210 6% 45%;
 
-    /* Glow effects */
-    --glow-primary: 185 100% 50%;
-    --glow-damage: 0 85% 55%;
-    --glow-success: 145 70% 45%;
+    /* Glow effects toned down for minimalism */
+    --glow-primary: 45 85% 55%;
+    --glow-damage: 0 72% 55%;
+    --glow-success: 145 45% 45%;
 
     /* Sidebar - keeping for compatibility */
     --sidebar-background: 220 20% 6%;
@@ -144,7 +143,7 @@
   }
 
   .rank-gold {
-    @apply bg-gradient-to-r from-yellow-500 to-amber-400;
+    @apply bg-gradient-to-r from-blue-400 to-blue-200;
     box-shadow: 0 0 15px hsl(var(--rank-gold) / 0.4);
   }
 

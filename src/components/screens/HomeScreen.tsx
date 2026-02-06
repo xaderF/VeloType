@@ -16,10 +16,7 @@ export function HomeScreen({ username, rating, onPlayRanked }: HomeScreenProps) 
   const nextRank = nextRankIndex < RANKS.length ? RANKS[nextRankIndex] : null;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-grid-pattern relative overflow-hidden">
-      {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
 
       <motion.div
         className="relative z-10 text-center space-y-12 max-w-lg"
@@ -33,11 +30,11 @@ export function HomeScreen({ username, rating, onPlayRanked }: HomeScreenProps) 
           transition={{ delay: 0.1 }}
         >
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-2">
-            <span className="text-primary text-glow-primary">TYPE</span>
-            <span className="text-foreground">ARENA</span>
+            <span className="text-primary">Velo</span>
+            <span className="text-foreground">Type</span>
           </h1>
           <p className="text-muted-foreground">
-            Ranked 1v1 Typing Battles
+            Minimal, deterministic 1v1 typing duels
           </p>
         </motion.div>
 

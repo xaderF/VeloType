@@ -1,10 +1,17 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { TypingState } from '@/types/game';
-import { calculateWPM, calculateAccuracy, RoundStats } from '@/utils/scoring';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import type { KeyboardEvent } from 'react';
+import { RoundStats } from '@/utils/scoring';
+import {
+  TypingMode,
+  createTypingState,
+  typingReducer,
+  buildMetrics,
+} from '@/game/engine';
 
 interface UseTypingEngineProps {
   text: string;
   isActive: boolean;
+  mode?: TypingMode;
   onComplete?: (stats: RoundStats) => void;
   timeLimit?: number; // in seconds
 }
@@ -12,71 +19,43 @@ interface UseTypingEngineProps {
 export function useTypingEngine({
   text,
   isActive,
+  mode = 'time',
   onComplete,
   timeLimit = 30,
 }: UseTypingEngineProps) {
-  const [state, setState] = useState<TypingState>({
-    text,
-    currentIndex: 0,
-    errors: 0,
-    correctChars: 0,
-    startTime: null,
-    endTime: null,
-    isComplete: false,
-  });
-
-  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasStarted = useRef(false);
+  const hasReported = useRef(false);
 
-  // Reset when text changes
+  const [state, dispatch] = useReducer(
+    typingReducer,
+    createTypingState(text, {
+      mode,
+      limit: timeLimit,
+      length: text.length,
+    })
+  );
+
+  // Reset when text or mode changes
   useEffect(() => {
-    setState({
-      text,
-      currentIndex: 0,
-      errors: 0,
-      correctChars: 0,
-      startTime: null,
-      endTime: null,
-      isComplete: false,
+    hasReported.current = false;
+    dispatch({
+      type: 'RESET',
+      payload: {
+        target: text,
+        options: { mode, limit: timeLimit, length: text.length },
+      },
     });
-    setTimeRemaining(timeLimit);
-    hasStarted.current = false;
-  }, [text, timeLimit]);
+  }, [text, mode, timeLimit]);
 
-  // Timer countdown
+  // Tick interval for time-based mode and consistency sampling
   useEffect(() => {
-    if (!isActive || state.isComplete) return;
-    if (!hasStarted.current) return;
-
+    if (!isActive || state.status === 'finished') return;
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          // Time's up - complete the round
-          const endTime = Date.now();
-          const timeElapsed = state.startTime 
-            ? (endTime - state.startTime) / 1000 
-            : timeLimit;
-          
-          const stats: RoundStats = {
-            wpm: calculateWPM(state.correctChars, timeElapsed),
-            accuracy: calculateAccuracy(state.correctChars, state.currentIndex),
-            errors: state.errors,
-            charactersTyped: state.currentIndex,
-            correctCharacters: state.correctChars,
-          };
-
-          setState((s) => ({ ...s, isComplete: true, endTime }));
-          onComplete?.(stats);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      dispatch({ type: 'TICK', payload: { nowMs: Date.now() } });
+    }, 500);
 
     return () => clearInterval(interval);
-  }, [isActive, state.isComplete, state.startTime, state.correctChars, state.currentIndex, state.errors, timeLimit, onComplete]);
+  }, [isActive, state.status]);
 
   // Focus input when active
   useEffect(() => {
@@ -85,113 +64,72 @@ export function useTypingEngine({
     }
   }, [isActive]);
 
+  // Notify completion exactly once
+  useEffect(() => {
+    if (state.status !== 'finished' || hasReported.current) return;
+    hasReported.current = true;
+    const metrics = buildMetrics(state, Date.now());
+    const stats: RoundStats = {
+      wpm: metrics.wpm,
+      rawWpm: metrics.rawWpm,
+      accuracy: metrics.accuracy,
+      consistency: metrics.consistency,
+      errors: metrics.errors,
+      charactersTyped: metrics.totalTyped,
+      correctCharacters: metrics.correctChars,
+    };
+    onComplete?.(stats);
+  }, [state, onComplete]);
+
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (!isActive || state.isComplete) return;
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!isActive || state.status === 'finished') return;
 
-      // Start timer on first keypress
-      if (!hasStarted.current) {
-        hasStarted.current = true;
-        setState((s) => ({ ...s, startTime: Date.now() }));
-      }
+      const nowMs = Date.now();
 
-      const { key } = e;
-      const currentChar = text[state.currentIndex];
-
-      // Handle backspace
-      if (key === 'Backspace') {
-        if (state.currentIndex > 0) {
-          setState((s) => ({
-            ...s,
-            currentIndex: s.currentIndex - 1,
-          }));
-        }
+      if (e.key === 'Backspace') {
+        dispatch({ type: 'BACKSPACE', payload: { nowMs } });
         return;
       }
 
-      // Ignore modifier keys and special keys
-      if (key.length !== 1) return;
-
-      const isCorrect = key === currentChar;
-
-      setState((s) => {
-        const newIndex = s.currentIndex + 1;
-        const newCorrectChars = isCorrect ? s.correctChars + 1 : s.correctChars;
-        const newErrors = isCorrect ? s.errors : s.errors + 1;
-        const isComplete = newIndex >= text.length;
-
-        if (isComplete) {
-          const endTime = Date.now();
-          const timeElapsed = s.startTime 
-            ? (endTime - s.startTime) / 1000 
-            : 0;
-
-          const stats: RoundStats = {
-            wpm: calculateWPM(newCorrectChars, timeElapsed),
-            accuracy: calculateAccuracy(newCorrectChars, newIndex),
-            errors: newErrors,
-            charactersTyped: newIndex,
-            correctCharacters: newCorrectChars,
-          };
-
-          setTimeout(() => onComplete?.(stats), 0);
-
-          return {
-            ...s,
-            currentIndex: newIndex,
-            correctChars: newCorrectChars,
-            errors: newErrors,
-            isComplete: true,
-            endTime,
-          };
-        }
-
-        return {
-          ...s,
-          currentIndex: newIndex,
-          correctChars: newCorrectChars,
-          errors: newErrors,
-        };
-      });
+      if (e.key.length !== 1) return;
+      dispatch({ type: 'TYPE_CHAR', payload: { char: e.key, nowMs } });
     },
-    [isActive, state.currentIndex, state.isComplete, text, onComplete]
+    [isActive, state.status]
   );
 
-  const getCurrentStats = useCallback((): Partial<RoundStats> => {
-    const timeElapsed = state.startTime 
-      ? (Date.now() - state.startTime) / 1000 
-      : 0;
+  const metrics = useMemo(() => buildMetrics(state, Date.now()), [state]);
 
-    return {
-      wpm: calculateWPM(state.correctChars, timeElapsed),
-      accuracy: calculateAccuracy(state.correctChars, state.currentIndex),
-      errors: state.errors,
-      charactersTyped: state.currentIndex,
-      correctCharacters: state.correctChars,
-    };
-  }, [state]);
+  const timeRemaining = useMemo(() => {
+    if (state.mode !== 'time') return timeLimit;
+    if (!state.startedAtMs) return timeLimit;
+    const reference = state.endedAtMs ?? Date.now();
+    const elapsedSeconds = Math.floor((reference - state.startedAtMs) / 1000);
+    return Math.max(0, state.limit - elapsedSeconds);
+  }, [state, timeLimit]);
 
   const reset = useCallback(() => {
-    setState({
-      text,
-      currentIndex: 0,
-      errors: 0,
-      correctChars: 0,
-      startTime: null,
-      endTime: null,
-      isComplete: false,
+    hasReported.current = false;
+    dispatch({
+      type: 'RESET',
+      payload: {
+        target: text,
+        options: { mode, limit: timeLimit, length: text.length },
+      },
     });
-    setTimeRemaining(timeLimit);
-    hasStarted.current = false;
-  }, [text, timeLimit]);
+  }, [text, mode, timeLimit]);
+
+  const progress = state.target.length
+    ? (state.cursor / state.target.length) * 100
+    : 0;
 
   return {
     state,
     timeRemaining,
     inputRef,
     handleKeyDown,
-    getCurrentStats,
+    metrics,
     reset,
-    progress: (state.currentIndex / text.length) * 100,
+    progress,
   };
 }

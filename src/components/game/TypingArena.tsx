@@ -25,7 +25,7 @@ export function TypingArena({
     timeRemaining,
     inputRef,
     handleKeyDown,
-    getCurrentStats,
+    metrics,
     progress,
   } = useTypingEngine({
     text,
@@ -35,7 +35,7 @@ export function TypingArena({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const currentStats = getCurrentStats();
+  const accuracyPercent = Math.round((metrics.accuracy || 0) * 100);
 
   // Focus container on click
   useEffect(() => {
@@ -79,13 +79,13 @@ export function TypingArena({
       />
 
       {/* Typing area */}
-      <div className="p-8 rounded-2xl border border-border bg-card/50 backdrop-blur-sm">
+      <div className="p-8 rounded-xl border border-border bg-card">
         {/* Live stats bar */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
           <div className="flex items-center gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold font-mono text-primary">
-                {currentStats.wpm || 0}
+                {Math.round(metrics.wpm) || 0}
               </div>
               <div className="text-xs text-muted-foreground uppercase tracking-wider">
                 WPM
@@ -93,7 +93,7 @@ export function TypingArena({
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold font-mono">
-                {currentStats.accuracy || 100}%
+                {accuracyPercent}%
               </div>
               <div className="text-xs text-muted-foreground uppercase tracking-wider">
                 Accuracy
@@ -101,7 +101,7 @@ export function TypingArena({
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold font-mono text-damage">
-                {currentStats.errors || 0}
+                {metrics.errors || 0}
               </div>
               <div className="text-xs text-muted-foreground uppercase tracking-wider">
                 Errors
@@ -111,14 +111,15 @@ export function TypingArena({
           
           {/* Progress indicator */}
           <div className="text-sm text-muted-foreground">
-            {state.currentIndex} / {text.length} characters
+            {state.cursor} / {state.target.length} characters
           </div>
         </div>
 
         {/* Text display */}
         <TypingDisplay
-          text={text}
-          currentIndex={state.currentIndex}
+          text={state.target}
+          typed={state.typed}
+          currentIndex={state.cursor}
           className="min-h-[120px]"
         />
 
@@ -132,7 +133,7 @@ export function TypingArena({
         </div>
 
         {/* Focus hint */}
-        {isActive && !state.startTime && (
+        {isActive && !state.startedAtMs && (
           <motion.div
             className="mt-4 text-center text-muted-foreground text-sm"
             initial={{ opacity: 0 }}
@@ -144,7 +145,7 @@ export function TypingArena({
         )}
 
         {/* Completion message */}
-        {state.isComplete && (
+        {state.status === 'finished' && (
           <motion.div
             className="mt-4 text-center text-hp-full font-semibold"
             initial={{ opacity: 0, scale: 0.8 }}

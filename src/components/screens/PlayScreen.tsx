@@ -43,6 +43,16 @@ export function PlayScreen({
           />
         </motion.div>
 
+        {/* Phrase Type Selection */}
+        <div className="mb-4 flex justify-center">
+          <select className="px-3 py-2 rounded border bg-background text-foreground" style={{ minWidth: 180 }}>
+            <option value="words">Words</option>
+            <option value="quote">Quote</option>
+            <option value="punctuation">Punctuation</option>
+            <option value="numbers">Numbers</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
         {/* Typing Arena */}
         <div className="flex-1 flex items-center">
           <TypingArena

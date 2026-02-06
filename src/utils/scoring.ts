@@ -1,6 +1,8 @@
 export interface RoundStats {
   wpm: number;
-  accuracy: number;
+  rawWpm: number;
+  accuracy: number; // 0-1 ratio
+  consistency: number; // 0-1 score based on WPM variance
   errors: number;
   charactersTyped: number;
   correctCharacters: number;
@@ -14,40 +16,35 @@ export interface MatchResult {
   damageTaken: number;
 }
 
-// Calculate WPM from characters and time
 export function calculateWPM(characters: number, timeSeconds: number): number {
-  if (timeSeconds === 0) return 0;
-  // Standard: 5 characters = 1 word
-  const words = characters / 5;
-  const minutes = timeSeconds / 60;
-  return Math.round(words / minutes);
+  if (timeSeconds <= 0) return 0;
+  return (characters / 5) / (timeSeconds / 60);
 }
 
-// Calculate net WPM (accounting for errors)
 export function calculateNetWPM(
   correctCharacters: number,
   errors: number,
   timeSeconds: number
 ): number {
-  if (timeSeconds === 0) return 0;
+  if (timeSeconds <= 0) return 0;
   const netCharacters = Math.max(0, correctCharacters - errors);
-  const words = netCharacters / 5;
-  const minutes = timeSeconds / 60;
-  return Math.round(words / minutes);
+  return (netCharacters / 5) / (timeSeconds / 60);
 }
 
-// Calculate accuracy percentage
 export function calculateAccuracy(correct: number, total: number): number {
-  if (total === 0) return 100;
-  return Math.round((correct / total) * 100);
+  return correct / Math.max(1, total);
 }
 
-// Calculate score for damage calculation
-export function calculateScore(wpm: number, accuracy: number): number {
-  return wpm * (accuracy / 100);
+export function calculatePerformanceScore({
+  wpm,
+  accuracy,
+  consistency,
+}: Pick<RoundStats, 'wpm' | 'accuracy' | 'consistency'>): number {
+  const accuracyFactor = 0.6 + 0.4 * accuracy;
+  const consistencyFactor = 0.7 + 0.3 * consistency;
+  return wpm * accuracyFactor * consistencyFactor;
 }
 
-// Calculate damage dealt in a round
 export function calculateDamage(
   attackerScore: number,
   defenderScore: number,
@@ -57,15 +54,17 @@ export function calculateDamage(
   return Math.min(maxDamage, Math.round(rawDamage));
 }
 
-// ELO rating calculation
 export function calculateEloChange(
   playerRating: number,
   opponentRating: number,
-  won: boolean,
+  result: 'win' | 'loss' | 'draw',
   kFactor: number = 32
 ): number {
   const expectedScore = 1 / (1 + Math.pow(10, (opponentRating - playerRating) / 400));
-  const actualScore = won ? 1 : 0;
+  let actualScore = 0;
+  if (result === 'win') actualScore = 1;
+  else if (result === 'draw') actualScore = 0.25; // 25% of win value
+  else actualScore = 0;
   return Math.round(kFactor * (actualScore - expectedScore));
 }
 

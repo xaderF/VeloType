@@ -26,6 +26,9 @@ const Index = () => {
     getCurrentText,
     playAgain,
     getEloChange,
+    offerDraw,
+    drawOffered,
+    drawAccepted,
   } = useGameState({
     initialRating: 1150,
     username,
@@ -50,24 +53,36 @@ const Index = () => {
   // Calculate aggregate stats for results screen
   const getAggregateStats = (): RoundStats => {
     if (!match || match.roundResults.length === 0) {
-      return { wpm: 0, accuracy: 100, errors: 0, charactersTyped: 0, correctCharacters: 0 };
+      return {
+        wpm: 0,
+        rawWpm: 0,
+        accuracy: 0,
+        consistency: 1,
+        errors: 0,
+        charactersTyped: 0,
+        correctCharacters: 0,
+      };
     }
     
     const totals = match.roundResults.reduce(
       (acc, r) => ({
         wpm: acc.wpm + r.playerStats.wpm,
+        rawWpm: acc.rawWpm + r.playerStats.rawWpm,
         accuracy: acc.accuracy + r.playerStats.accuracy,
+        consistency: acc.consistency + r.playerStats.consistency,
         errors: acc.errors + r.playerStats.errors,
         charactersTyped: acc.charactersTyped + r.playerStats.charactersTyped,
         correctCharacters: acc.correctCharacters + r.playerStats.correctCharacters,
       }),
-      { wpm: 0, accuracy: 0, errors: 0, charactersTyped: 0, correctCharacters: 0 }
+      { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 0, errors: 0, charactersTyped: 0, correctCharacters: 0 }
     );
 
     const count = match.roundResults.length;
     return {
-      wpm: Math.round(totals.wpm / count),
-      accuracy: Math.round(totals.accuracy / count),
+      wpm: totals.wpm / count,
+      rawWpm: totals.rawWpm / count,
+      accuracy: totals.accuracy / count,
+      consistency: totals.consistency / count,
       errors: totals.errors,
       charactersTyped: totals.charactersTyped,
       correctCharacters: totals.correctCharacters,
@@ -76,24 +91,36 @@ const Index = () => {
 
   const getOpponentAggregateStats = (): RoundStats => {
     if (!match || match.roundResults.length === 0) {
-      return { wpm: 0, accuracy: 100, errors: 0, charactersTyped: 0, correctCharacters: 0 };
+      return {
+        wpm: 0,
+        rawWpm: 0,
+        accuracy: 0,
+        consistency: 1,
+        errors: 0,
+        charactersTyped: 0,
+        correctCharacters: 0,
+      };
     }
     
     const totals = match.roundResults.reduce(
       (acc, r) => ({
         wpm: acc.wpm + r.opponentStats.wpm,
+        rawWpm: acc.rawWpm + r.opponentStats.rawWpm,
         accuracy: acc.accuracy + r.opponentStats.accuracy,
+        consistency: acc.consistency + r.opponentStats.consistency,
         errors: acc.errors + r.opponentStats.errors,
         charactersTyped: acc.charactersTyped + r.opponentStats.charactersTyped,
         correctCharacters: acc.correctCharacters + r.opponentStats.correctCharacters,
       }),
-      { wpm: 0, accuracy: 0, errors: 0, charactersTyped: 0, correctCharacters: 0 }
+      { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 0, errors: 0, charactersTyped: 0, correctCharacters: 0 }
     );
 
     const count = match.roundResults.length;
     return {
-      wpm: Math.round(totals.wpm / count),
-      accuracy: Math.round(totals.accuracy / count),
+      wpm: totals.wpm / count,
+      rawWpm: totals.rawWpm / count,
+      accuracy: totals.accuracy / count,
+      consistency: totals.consistency / count,
       errors: totals.errors,
       charactersTyped: totals.charactersTyped,
       correctCharacters: totals.correctCharacters,
@@ -156,6 +183,11 @@ const Index = () => {
       <RoundEndOverlay
         isVisible={phase === 'round_end'}
         roundResult={lastRoundResult}
+        drawAvailable={Boolean(match && match.roundResults.length >= 10)}
+        drawOffered={drawOffered}
+        drawAccepted={drawAccepted}
+        onOfferDraw={offerDraw}
+        breakSeconds={15}
       />
     </div>
   );

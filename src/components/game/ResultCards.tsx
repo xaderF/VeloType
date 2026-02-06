@@ -97,13 +97,13 @@ export function RoundResultCard({
           <div className="grid grid-cols-2 gap-2 text-center">
             <div>
               <div className="text-2xl font-bold font-mono text-primary">
-                {playerStats.wpm}
+                {Math.round(playerStats.wpm)}
               </div>
               <div className="text-xs text-muted-foreground">WPM</div>
             </div>
             <div>
               <div className="text-2xl font-bold font-mono">
-                {playerStats.accuracy}%
+                {Math.round(playerStats.accuracy * 100)}%
               </div>
               <div className="text-xs text-muted-foreground">Accuracy</div>
             </div>
@@ -129,13 +129,13 @@ export function RoundResultCard({
           <div className="grid grid-cols-2 gap-2 text-center">
             <div>
               <div className="text-2xl font-bold font-mono text-primary">
-                {opponentStats.wpm}
+                {Math.round(opponentStats.wpm)}
               </div>
               <div className="text-xs text-muted-foreground">WPM</div>
             </div>
             <div>
               <div className="text-2xl font-bold font-mono">
-                {opponentStats.accuracy}%
+                {Math.round(opponentStats.accuracy * 100)}%
               </div>
               <div className="text-xs text-muted-foreground">Accuracy</div>
             </div>
@@ -220,13 +220,13 @@ export function MatchResults({
       <div className="grid grid-cols-4 gap-4">
         <StatCard 
           label="WPM" 
-          value={playerStats.wpm} 
+          value={Math.round(playerStats.wpm)} 
           highlight 
           delay={0.1} 
         />
         <StatCard 
           label="Accuracy" 
-          value={playerStats.accuracy} 
+          value={Math.round(playerStats.accuracy * 100)} 
           suffix="%" 
           delay={0.2} 
         />
@@ -236,8 +236,9 @@ export function MatchResults({
           delay={0.3} 
         />
         <StatCard 
-          label="Characters" 
-          value={playerStats.charactersTyped} 
+          label="Consistency" 
+          value={Math.round(playerStats.consistency * 100)} 
+          suffix="%"
           delay={0.4} 
         />
       </div>

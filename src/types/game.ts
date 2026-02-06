@@ -9,20 +9,12 @@ export interface Player {
   maxHp: number;
 }
 
-export interface TypingState {
-  text: string;
-  currentIndex: number;
-  errors: number;
-  correctChars: number;
-  startTime: number | null;
-  endTime: number | null;
-  isComplete: boolean;
-}
-
 export interface RoundResult {
   roundNumber: number;
   playerStats: RoundStats;
   opponentStats: RoundStats;
+  playerScore: number;
+  opponentScore: number;
   winner: 'player' | 'opponent' | 'draw';
   damageDealt: number;
   damageTaken: number;

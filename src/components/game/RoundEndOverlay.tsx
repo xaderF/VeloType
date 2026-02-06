@@ -7,9 +7,23 @@ interface RoundEndOverlayProps {
   isVisible: boolean;
   roundResult: RoundResult | null;
   onContinue?: () => void;
+  drawAvailable?: boolean;
+  drawOffered?: boolean;
+  drawAccepted?: boolean;
+  onOfferDraw?: () => void;
+  breakSeconds?: number;
 }
 
-export function RoundEndOverlay({ isVisible, roundResult, onContinue }: RoundEndOverlayProps) {
+export function RoundEndOverlay({
+  isVisible,
+  roundResult,
+  onContinue,
+  drawAvailable = false,
+  drawOffered = false,
+  drawAccepted = false,
+  onOfferDraw,
+  breakSeconds = 15,
+}: RoundEndOverlayProps) {
   if (!roundResult) return null;
 
   return (
@@ -37,12 +51,34 @@ export function RoundEndOverlay({ isVisible, roundResult, onContinue }: RoundEnd
             />
 
             <motion.div
-              className="text-center mt-6 text-muted-foreground"
+              className="text-center mt-6 text-muted-foreground space-y-3"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1 }}
             >
-              Next round starting soon...
+              <div>Break: next round auto-starts in {breakSeconds}s</div>
+
+              {drawAvailable && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="text-sm text-muted-foreground">
+                    Overtime draw option unlocked (round 10+). Both players must confirm.
+                  </div>
+                  <button
+                    className={cn(
+                      "px-4 py-2 rounded-md border text-sm font-medium transition-colors",
+                      drawAccepted
+                        ? "bg-secondary text-foreground"
+                        : drawOffered
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    )}
+                    disabled={drawAccepted}
+                    onClick={onOfferDraw}
+                  >
+                    {drawAccepted ? 'Draw confirmed' : drawOffered ? 'Waiting for opponent...' : 'Offer draw'}
+                  </button>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         </motion.div>
