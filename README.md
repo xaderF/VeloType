@@ -114,8 +114,8 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] Deterministic typing engine
 - [x] Strongly typed game logic using TypeScript
 - [x] Modular frontend architecture
-- [ ] Repository structure cleanup and tooling polish
-- [ ] Environment configuration standardization
+- [x] Repository structure cleanup and tooling polish
+- [x] Environment configuration standardization
 
 ### Phase 2 — Persistence & Accounts
 - [ ] Backend API setup
