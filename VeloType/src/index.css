@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+@layer base {
+  :root {
+    /* Core dark theme - deep blacks with subtle blue undertones */
+    --background: 220 20% 4%;
+    --foreground: 210 20% 95%;
+
+    --card: 220 20% 6%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 220 20% 8%;
+    --popover-foreground: 210 20% 95%;
+
+    /* Electric cyan primary - the competitive edge */
+    --primary: 185 100% 50%;
+    --primary-foreground: 220 20% 4%;
+
+    /* Muted grays for secondary elements */
+    --secondary: 220 15% 12%;
+    --secondary-foreground: 210 15% 70%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 210 10% 50%;
+
+    --accent: 185 80% 40%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 210 20% 95%;
+
+    --border: 220 15% 15%;
+    --input: 220 15% 12%;
+    --ring: 185 100% 50%;
+
+    --radius: 0.5rem;
+
+    /* Rank colors - gaming aesthetic */
+    --rank-bronze: 30 60% 45%;
+    --rank-silver: 220 10% 65%;
+    --rank-gold: 45 90% 55%;
+    --rank-platinum: 185 50% 60%;
+    --rank-diamond: 270 80% 65%;
+
+    /* Game-specific colors */
+    --hp-full: 145 70% 45%;
+    --hp-mid: 45 90% 55%;
+    --hp-low: 0 85% 55%;
+    --damage: 0 85% 55%;
+    
+    /* Typing colors */
+    --typing-correct: 185 100% 50%;
+    --typing-error: 0 85% 55%;
+    --typing-current: 185 100% 50%;
+    --typing-pending: 210 10% 35%;
+
+    /* Glow effects */
+    --glow-primary: 185 100% 50%;
+    --glow-damage: 0 85% 55%;
+    --glow-success: 145 70% 45%;
+
+    /* Sidebar - keeping for compatibility */
+    --sidebar-background: 220 20% 6%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 185 100% 50%;
+    --sidebar-primary-foreground: 220 20% 4%;
+    --sidebar-accent: 220 15% 12%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 220 15% 15%;
+    --sidebar-ring: 185 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Monospace for typing elements */
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3),
+                0 0 40px hsl(var(--glow-primary) / 0.15),
+                0 0 60px hsl(var(--glow-primary) / 0.05);
+  }
+
+  .glow-primary-intense {
+    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.5),
+                0 0 40px hsl(var(--glow-primary) / 0.3),
+                0 0 80px hsl(var(--glow-primary) / 0.15);
+  }
+
+  .glow-damage {
+    box-shadow: 0 0 20px hsl(var(--glow-damage) / 0.5),
+                0 0 40px hsl(var(--glow-damage) / 0.3);
+  }
+
+  .glow-success {
+    box-shadow: 0 0 20px hsl(var(--glow-success) / 0.5),
+                0 0 40px hsl(var(--glow-success) / 0.3);
+  }
+
+  /* Text glow */
+  .text-glow-primary {
+    text-shadow: 0 0 10px hsl(var(--glow-primary) / 0.5),
+                 0 0 20px hsl(var(--glow-primary) / 0.3);
+  }
+
+  .text-glow-damage {
+    text-shadow: 0 0 10px hsl(var(--glow-damage) / 0.5),
+                 0 0 20px hsl(var(--glow-damage) / 0.3);
+  }
+
+  /* Rank badge styles */
+  .rank-bronze {
+    @apply bg-gradient-to-r from-amber-700 to-amber-600;
+    box-shadow: 0 0 15px hsl(var(--rank-bronze) / 0.4);
+  }
+
+  .rank-silver {
+    @apply bg-gradient-to-r from-slate-400 to-slate-300;
+    box-shadow: 0 0 15px hsl(var(--rank-silver) / 0.4);
+  }
+
+  .rank-gold {
+    @apply bg-gradient-to-r from-yellow-500 to-amber-400;
+    box-shadow: 0 0 15px hsl(var(--rank-gold) / 0.4);
+  }
+
+  .rank-platinum {
+    @apply bg-gradient-to-r from-cyan-400 to-teal-300;
+    box-shadow: 0 0 15px hsl(var(--rank-platinum) / 0.4);
+  }
+
+  .rank-diamond {
+    @apply bg-gradient-to-r from-violet-500 to-purple-400;
+    box-shadow: 0 0 15px hsl(var(--rank-diamond) / 0.4);
+  }
+
+  /* HP Bar gradients */
+  .hp-gradient-full {
+    background: linear-gradient(90deg, hsl(var(--hp-full)) 0%, hsl(150 80% 50%) 100%);
+  }
+
+  .hp-gradient-mid {
+    background: linear-gradient(90deg, hsl(var(--hp-mid)) 0%, hsl(35 90% 55%) 100%);
+  }
+
+  .hp-gradient-low {
+    background: linear-gradient(90deg, hsl(var(--hp-low)) 0%, hsl(0 70% 45%) 100%);
+  }
+
+  /* Subtle grid background pattern */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Scanline effect for retro-future feel */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      hsl(var(--background) / 0.03) 2px,
+      hsl(var(--background) / 0.03) 4px
+    );
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 30px hsl(var(--glow-primary) / 0.5),
+                  0 0 60px hsl(var(--glow-primary) / 0.2);
+    }
+  }
+
+  .animate-damage-shake {
+    animation: damage-shake 0.5s ease-in-out;
+  }
+
+  @keyframes damage-shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  }
+
+  .animate-hp-decrease {
+    animation: hp-decrease 0.3s ease-out;
+  }
+
+  @keyframes hp-decrease {
+    0% { filter: brightness(1.5); }
+    100% { filter: brightness(1); }
+  }
+}
