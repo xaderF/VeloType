@@ -118,7 +118,7 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] Environment configuration standardization
 
 ### Phase 2 — Persistence & Accounts
-- [ ] Backend API setup
+- [x] Backend API setup
 - [ ] Database integration (users, profiles, matches)
 - [ ] Authentication (OAuth or email-based)
 - [ ] User profiles with persisted settings
