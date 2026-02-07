@@ -1,19 +1,15 @@
 import { motion } from 'framer-motion';
 import { RankBadge } from '@/components/game-ui/RankBadge';
-import { getProgressToNextRank, getRankFromRating, RANKS } from '@/utils/scoring';
 import { cn } from '@/lib/utils';
 
 interface HomeScreenProps {
   username: string;
-  rating: number;
+  rating: number | null;
   onPlayRanked: () => void;
 }
 
 export function HomeScreen({ username, rating, onPlayRanked }: HomeScreenProps) {
-  const rankInfo = getRankFromRating(rating);
-  const progress = getProgressToNextRank(rating);
-  const nextRankIndex = RANKS.findIndex(r => r.rank === rankInfo.rank) + 1;
-  const nextRank = nextRankIndex < RANKS.length ? RANKS[nextRankIndex] : null;
+  const isGuest = !username || username === 'Player' || rating == null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
@@ -45,36 +41,19 @@ export function HomeScreen({ username, rating, onPlayRanked }: HomeScreenProps) 
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="flex items-center justify-center gap-4">
             <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-3xl border-2 border-primary">
               👤
             </div>
             <div className="text-left">
-              <div className="text-xl font-semibold">{username}</div>
-              <RankBadge rating={rating} showRating size="sm" />
+              <div className="text-xl font-semibold">{isGuest ? 'Player' : username}</div>
+              {isGuest ? (
+                <span className="inline-block px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-sm font-semibold mt-1">Unranked</span>
+              ) : (
+                <RankBadge rating={rating} size="sm" />
+              )}
             </div>
           </div>
-
-          {/* Progress to next rank */}
-          {nextRank && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{rankInfo.name}</span>
-                <span>{nextRank.name}</span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <motion.div
-                  className={cn("h-full", rankInfo.color)}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ delay: 0.5, duration: 0.5 }}
-                />
-              </div>
-              <div className="text-xs text-center text-muted-foreground">
-                {nextRank.minRating - rating} points to {nextRank.name}
-              </div>
-            </div>
-          )}
         </motion.div>
 
         {/* Play Button */}

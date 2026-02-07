@@ -45,11 +45,15 @@
     --radius: 0.5rem;
 
     /* Rank colors - slightly desaturated to match minimalist vibe */
+    --rank-iron: 0 0% 50%;
     --rank-bronze: 30 45% 45%;
     --rank-silver: 220 8% 65%;
     --rank-gold: 45 80% 55%;
     --rank-platinum: 185 40% 55%;
     --rank-diamond: 260 60% 60%;
+    --rank-velocity: 200 80% 50%;
+    --rank-apex: 15 90% 55%;
+    --rank-paragon: 340 85% 60%;
 
     /* Game-specific colors */
     --hp-full: 145 45% 45%;
@@ -58,9 +62,9 @@
     --damage: 0 72% 55%;
     
     /* Typing colors */
-    --typing-correct: 45 85% 55%;
+    --typing-correct: 45 8% 88%;
     --typing-error: 0 72% 55%;
-    --typing-current: 45 85% 70%;
+    --typing-current: 210 100% 70%;
     --typing-pending: 210 6% 45%;
 
     /* Glow effects toned down for minimalism */
@@ -132,6 +136,11 @@
   }
 
   /* Rank badge styles */
+  .rank-iron {
+    @apply bg-gradient-to-r from-gray-500 to-gray-400;
+    box-shadow: 0 0 15px hsl(var(--rank-iron) / 0.4);
+  }
+
   .rank-bronze {
     @apply bg-gradient-to-r from-amber-700 to-amber-600;
     box-shadow: 0 0 15px hsl(var(--rank-bronze) / 0.4);
@@ -155,6 +164,21 @@
   .rank-diamond {
     @apply bg-gradient-to-r from-violet-500 to-purple-400;
     box-shadow: 0 0 15px hsl(var(--rank-diamond) / 0.4);
+  }
+
+  .rank-velocity {
+    @apply bg-gradient-to-r from-sky-500 to-blue-400;
+    box-shadow: 0 0 15px hsl(var(--rank-velocity) / 0.4);
+  }
+
+  .rank-apex {
+    @apply bg-gradient-to-r from-orange-500 to-red-500;
+    box-shadow: 0 0 20px hsl(var(--rank-apex) / 0.5);
+  }
+
+  .rank-paragon {
+    @apply bg-gradient-to-r from-rose-500 to-pink-500;
+    box-shadow: 0 0 25px hsl(var(--rank-paragon) / 0.6);
   }
 
   /* HP Bar gradients */
@@ -227,5 +251,18 @@
   @keyframes hp-decrease {
     0% { filter: brightness(1.5); }
     100% { filter: brightness(1); }
+  }
+
+  .typing-caret {
+    animation: typing-caret-blink 1s steps(1, end) infinite;
+  }
+
+  @keyframes typing-caret-blink {
+    0%, 49% {
+      opacity: 1;
+    }
+    50%, 100% {
+      opacity: 0;
+    }
   }
 }

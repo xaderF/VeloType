@@ -57,7 +57,7 @@ export function MatchFoundOverlay({
                   👤
                 </div>
                 <div className="font-semibold text-lg">{player.username}</div>
-                <RankBadge rating={player.rating} showRating />
+                <RankBadge rating={player.rating} />
               </motion.div>
 
               {/* VS */}
@@ -81,7 +81,7 @@ export function MatchFoundOverlay({
                   👤
                 </div>
                 <div className="font-semibold text-lg">{opponent.username}</div>
-                <RankBadge rating={opponent.rating} showRating />
+                <RankBadge rating={opponent.rating} />
               </motion.div>
             </div>
 

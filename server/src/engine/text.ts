@@ -1,11 +1,9 @@
-// text.ts
-// handles text generation and manipulation for typing matches.
-// uses make_rng from seed.ts and difficulty/type definitions.
-// provides curated word lists and generates random text based on seed, length, and difficulty.
-// used in typingdisplay and engine.
+// text.ts — server-side copy of client engine text generation
+// Must produce byte-identical output to the client for the same seed
 
-import { makeRng } from './seed';
-import { Difficulty } from './types';
+import { makeRng } from './seed.js';
+
+export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface GenerateTextOptions {
   seed: string | number;
@@ -14,7 +12,6 @@ export interface GenerateTextOptions {
   includePunctuation?: boolean;
 }
 
-// Curated list of competitive-friendly words
 export const wordList = [
   'velocity', 'precision', 'battle', 'arena', 'typing', 'rhythm', 'focus', 'momentum', 'resolve',
   'victory', 'accuracy', 'consistency', 'tempo', 'dexterity', 'agility', 'strategy', 'control',
@@ -24,7 +21,7 @@ export const wordList = [
   'pattern', 'combo', 'attack', 'defense', 'impact', 'charge', 'result', 'ranked', 'ladder', 'season',
   'player', 'opponent', 'winner', 'loser', 'match', 'round', 'seeded', 'fairness', 'deterministic',
   'damage', 'health', 'score', 'rating', 'elo', 'speed', 'accuracy', 'consistency', 'streak', 'moment',
-  'focus', 'intent', 'action', 'reaction', 'counter', 'burst', 'glide', 'strike', 'forge', 'ascend'
+  'focus', 'intent', 'action', 'reaction', 'counter', 'burst', 'glide', 'strike', 'forge', 'ascend',
 ];
 
 function injectPunctuation(words: string[], rng: () => number, difficulty: Difficulty): string {

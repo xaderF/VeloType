@@ -7,6 +7,7 @@ import {
   typingReducer,
   buildMetrics,
 } from '@/game/engine';
+import { computeWpm, computeRawWpm } from '@/game/engine/metrics';
 
 interface UseTypingEngineProps {
   text: string;
@@ -69,9 +70,15 @@ export function useTypingEngine({
     if (state.status !== 'finished' || hasReported.current) return;
     hasReported.current = true;
     const metrics = buildMetrics(state, Date.now());
+
+    // In timed mode use the full time limit for final WPM (MonkeyType-style).
+    // This prevents early submission from inflating WPM.
+    const timeLimitMs = timeLimit * 1000;
+    const finalWpmTime = mode === 'time' ? timeLimitMs : metrics.elapsedMs;
+
     const stats: RoundStats = {
-      wpm: metrics.wpm,
-      rawWpm: metrics.rawWpm,
+      wpm: computeWpm(metrics.correctChars, finalWpmTime),
+      rawWpm: computeRawWpm(metrics.totalTyped, finalWpmTime),
       accuracy: metrics.accuracy,
       consistency: metrics.consistency,
       errors: metrics.errors,
@@ -79,7 +86,7 @@ export function useTypingEngine({
       correctCharacters: metrics.correctChars,
     };
     onComplete?.(stats);
-  }, [state, onComplete]);
+  }, [state, onComplete, mode, timeLimit]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {

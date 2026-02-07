@@ -6,11 +6,12 @@ import { generateText } from '@/game/engine';
 export interface SeededTextOptions {
   length?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
+  includePunctuation?: boolean;
 }
 
 export function getSeededText(seed: string | number, options: SeededTextOptions = {}): string {
-  const { length = 200, difficulty = 'medium' } = options;
-  return generateText({ seed, length, difficulty });
+  const { length = 200, difficulty = 'medium', includePunctuation = false } = options;
+  return generateText({ seed, length, difficulty, includePunctuation });
 }
 
 export function generateMatchSeed(): number {

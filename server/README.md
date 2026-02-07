@@ -24,12 +24,19 @@ npm run dev
 
 ## Endpoints (current)
 - GET /health — health check
-- POST /auth/login — stub login (returns stub token)
-- GET /profile — stub profile
+- POST /auth/register — create account with username/password
+- POST /auth/login — login with username/email + password
+- POST /auth/oauth — OAuth-style identity login/link
+- GET /profile — fetch authenticated profile
+- PATCH /profile — update username/email/settings
+- GET /matches — list authenticated match history
+- GET /matches/:matchId — match details for authenticated player
 - WS /ws/matchmaking — in-memory queue + MATCH_FOUND payloads
+- WS /ws/match — live match updates (join/progress/result)
 
 ## Notes
 - Server uses Fastify + @fastify/websocket.
 - `env.ts` validates env vars with zod.
 - Matchmaking pairs by rating, widening search range over time; sends `MATCH_FOUND` with matchId, seed, config, startAt.
-- If `DATABASE_URL` is set and migrations are applied, matches are persisted (match + match_players rows). Otherwise it still runs in-memory.
+- Auth uses signed bearer tokens with `AUTH_SECRET` (falls back to a dev-only secret if unset).
+- If `DATABASE_URL` is set and migrations are applied, user/profile/match data is persisted via Prisma.

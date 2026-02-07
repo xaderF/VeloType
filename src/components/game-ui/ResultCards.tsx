@@ -5,37 +5,26 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { RoundStats } from '@/utils/scoring';
 
-interface StatCardProps {
+/* ---------- small stat (secondary row) ---------- */
+
+interface SmallStatProps {
   label: string;
   value: string | number;
-  suffix?: string;
-  highlight?: boolean;
   delay?: number;
 }
 
-function StatCard({ label, value, suffix, highlight, delay = 0 }: StatCardProps) {
+function SmallStat({ label, value, delay = 0 }: SmallStatProps) {
   return (
     <motion.div
-      className={cn(
-        "p-4 rounded-xl border",
-        highlight 
-          ? "border-primary bg-primary/10" 
-          : "border-border bg-card"
-      )}
-      initial={{ opacity: 0, y: 20, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.3 }}
+      className="text-center"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.25 }}
     >
-      <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+      <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
         {label}
       </div>
-      <div className={cn(
-        "text-2xl font-bold font-mono",
-        highlight && "text-primary text-glow-primary"
-      )}>
-        {value}
-        {suffix && <span className="text-lg text-muted-foreground ml-1">{suffix}</span>}
-      </div>
+      <div className="text-lg font-bold font-mono">{value}</div>
     </motion.div>
   );
 }
@@ -97,19 +86,17 @@ export function RoundResultCard({
           isPlayerWinner ? "border-hp-full bg-hp-full/10" : "border-border bg-card"
         )}>
           <div className="text-sm font-medium mb-3 text-center">You</div>
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div>
-              <div className="text-2xl font-bold font-mono text-primary">
-                {Math.round(playerStats.wpm)}
-              </div>
-              <div className="text-xs text-muted-foreground">WPM</div>
+          <div className="text-center mb-1">
+            <div className="text-3xl font-bold font-mono text-primary">
+              {Math.round(playerStats.wpm)}
             </div>
-            <div>
-              <div className="text-2xl font-bold font-mono">
-                {Math.round(playerStats.accuracy * 100)}%
-              </div>
-              <div className="text-xs text-muted-foreground">Accuracy</div>
+            <div className="text-xs text-muted-foreground">wpm</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold font-mono">
+              {Math.round(playerStats.accuracy * 100)}%
             </div>
+            <div className="text-xs text-muted-foreground">acc</div>
           </div>
           {damageDealt > 0 && (
             <motion.div
@@ -129,19 +116,17 @@ export function RoundResultCard({
           isOpponentWinner ? "border-damage bg-damage/10" : "border-border bg-card"
         )}>
           <div className="text-sm font-medium mb-3 text-center">Opponent</div>
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div>
-              <div className="text-2xl font-bold font-mono text-primary">
-                {Math.round(opponentStats.wpm)}
-              </div>
-              <div className="text-xs text-muted-foreground">WPM</div>
+          <div className="text-center mb-1">
+            <div className="text-3xl font-bold font-mono text-primary">
+              {Math.round(opponentStats.wpm)}
             </div>
-            <div>
-              <div className="text-2xl font-bold font-mono">
-                {Math.round(opponentStats.accuracy * 100)}%
-              </div>
-              <div className="text-xs text-muted-foreground">Accuracy</div>
+            <div className="text-xs text-muted-foreground">wpm</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold font-mono">
+              {Math.round(opponentStats.accuracy * 100)}%
             </div>
+            <div className="text-xs text-muted-foreground">acc</div>
           </div>
           {damageTaken > 0 && (
             <motion.div
@@ -219,39 +204,76 @@ export function MatchResults({
         </motion.div>
       </motion.div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard 
-          label="WPM" 
-          value={Math.round(playerStats.wpm)} 
-          highlight 
-          delay={0.1} 
-        />
-        <StatCard 
-          label="Accuracy" 
-          value={Math.round(playerStats.accuracy * 100)} 
-          suffix="%" 
-          delay={0.2} 
-        />
-        <StatCard 
-          label="Errors" 
-          value={playerStats.errors} 
-          delay={0.3} 
-        />
-        <StatCard 
-          label="Consistency" 
-          value={Math.round(playerStats.consistency * 100)} 
-          suffix="%"
-          delay={0.4} 
-        />
-      </div>
+      {/* ── MonkeyType-style stats ── */}
+      <motion.div
+        className="p-6 rounded-2xl border border-border bg-card/60"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+      >
+        {/* Hero stats: WPM + Accuracy */}
+        <div className="flex items-end gap-10 mb-6">
+          {/* WPM */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3, duration: 0.35 }}
+          >
+            <div className="text-sm font-medium text-muted-foreground tracking-wider mb-1">
+              wpm
+            </div>
+            <div className="text-6xl font-bold font-mono text-primary text-glow-primary leading-none">
+              {Math.round(playerStats.wpm)}
+            </div>
+          </motion.div>
+
+          {/* Accuracy */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.35 }}
+          >
+            <div className="text-sm font-medium text-muted-foreground tracking-wider mb-1">
+              acc
+            </div>
+            <div className="text-6xl font-bold font-mono text-primary leading-none">
+              {Math.round(playerStats.accuracy * 100)}
+              <span className="text-3xl">%</span>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Secondary stats row */}
+        <div className="flex items-center gap-8 pt-4 border-t border-border/50">
+          <SmallStat
+            label="raw"
+            value={Math.round(playerStats.rawWpm)}
+            delay={0.45}
+          />
+          <SmallStat
+            label="characters"
+            value={`${playerStats.correctCharacters}/${playerStats.errors}/0`}
+            delay={0.5}
+          />
+          <SmallStat
+            label="consistency"
+            value={`${Math.round(playerStats.consistency * 100)}%`}
+            delay={0.55}
+          />
+          <SmallStat
+            label="errors"
+            value={playerStats.errors}
+            delay={0.6}
+          />
+        </div>
+      </motion.div>
 
       {/* ELO change */}
       <motion.div
-        className="text-center p-6 rounded-xl border border-border bg-card"
+        className="text-center p-4 rounded-xl border border-border bg-card/50"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.65 }}
       >
         <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
           Rating Change
