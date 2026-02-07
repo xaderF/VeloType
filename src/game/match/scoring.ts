@@ -1,3 +1,7 @@
+// scoring.ts
+// implements scoring algorithms for matches, including rating calculations, round stats, and rank determination.
+// used in resultsscreen and engine.
+
 import { RoundResult } from './types';
 
 export function clamp(value: number, min: number, max: number): number {

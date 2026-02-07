@@ -1,3 +1,6 @@
+// TypingDisplay: Displays the text to be typed. Used in TypingArena.
+// Depends on: framer-motion, cn util.
+// Props: text, typed, currentIndex, className.
 import { motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';

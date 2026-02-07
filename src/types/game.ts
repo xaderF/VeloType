@@ -1,3 +1,6 @@
+// game.ts
+// type definitions for game logic and state, including player, match, and round types.
+
 import { Rank, RoundStats } from '@/utils/scoring';
 
 export interface Player {

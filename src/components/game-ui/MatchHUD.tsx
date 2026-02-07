@@ -1,3 +1,6 @@
+// MatchHUD: Main heads-up display for match info, health, and status. Uses HealthBar, RankBadge.
+// Depends on: framer-motion, HealthBar, RankBadge, Player type, cn util.
+// Props: player, opponent, currentRound.
 import { motion } from 'framer-motion';
 import { HealthBar } from './HealthBar';
 import { RankBadge } from './RankBadge';

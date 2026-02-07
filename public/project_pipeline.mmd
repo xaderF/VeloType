@@ -1,0 +1,41 @@
+graph TD
+  App[app.tsx]
+  Main[main.tsx]
+  Screens[components/screens]
+  GameUI[components/game-ui]
+  UI[components/ui]
+  Hooks[src/hooks]
+  Engine[game/engine]
+  Match[game/match]
+  Utils[src/utils]
+  Types[src/types]
+  Lib[src/lib]
+
+  Main --> App
+  App --> Screens
+  Screens --> GameUI
+  Screens --> UI
+  Screens --> Hooks
+  GameUI --> Engine
+  GameUI --> Match
+  GameUI --> UI
+  GameUI --> Hooks
+  Engine --> Utils
+  Engine --> Types
+  Engine --> Lib
+  Match --> Engine
+  Match --> Types
+  Match --> Utils
+  Hooks --> Engine
+  Hooks --> Match
+  Hooks --> Utils
+  UI --> Lib
+  UI --> Utils
+  App --> Pages
+  Pages[pages]
+  Pages --> Screens
+  Test[test]
+  Test --> Engine
+  Test --> Match
+  Test --> Utils
+  Test --> Types

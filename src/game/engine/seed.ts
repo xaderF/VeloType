@@ -1,3 +1,8 @@
+// seed.ts
+// generates deterministic random seeds for game sessions.
+// implements hashing and xorshift32 for pseudo-random number generation.
+// used in text generation and engine for reproducible matches.
+
 function hashSeed(seed: string | number): number {
   const input = String(seed);
   let hash = 2166136261;

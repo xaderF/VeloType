@@ -1,3 +1,8 @@
+// reducer.ts
+// handles game state transitions and manages typing state.
+// provides functions to create typing state, update state based on actions, and sample typing progress.
+// uses metrics, text generation, and types. used in typingarena and engine.
+
 import { buildMetrics, computeRawWpm } from './metrics';
 import { generateText } from './text';
 import { TypingAction, TypingOptions, TypingState } from './types';

@@ -1,3 +1,6 @@
+// QueueOverlay: Overlay for queueing players before match starts. Used in PlayScreen.
+// Depends on: framer-motion, cn util.
+// Props: isVisible, onCancel, elapsedTime, className.
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 

@@ -1,3 +1,6 @@
+// types.ts
+// type definitions for match logic, including player, match, round, and scoring structures.
+
 export type PlayerId = string;
 export type MatchSeed = string | number;
 

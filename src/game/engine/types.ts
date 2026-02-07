@@ -1,3 +1,7 @@
+// types.ts
+// type definitions for engine logic, including typingmode, typingstatus, difficulty, typingoptions, typingstate, and typingaction.
+// ensures type safety across engine modules.
+
 export type TypingMode = 'time' | 'text';
 
 export type TypingStatus = 'idle' | 'running' | 'finished';

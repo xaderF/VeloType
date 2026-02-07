@@ -1,12 +1,15 @@
+// Index.tsx
+// main page component, entry point for routing.
+
 import { useState, useEffect } from 'react';
 import { useGameState } from '@/hooks/useGameState';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 import { PlayScreen } from '@/components/screens/PlayScreen';
 import { ResultsScreen } from '@/components/screens/ResultsScreen';
-import { QueueOverlay } from '@/components/game/QueueOverlay';
-import { MatchFoundOverlay } from '@/components/game/MatchFoundOverlay';
-import { CountdownOverlay } from '@/components/game/CountdownOverlay';
-import { RoundEndOverlay } from '@/components/game/RoundEndOverlay';
+import { QueueOverlay } from '@/components/game-ui/QueueOverlay';
+import { MatchFoundOverlay } from '@/components/game-ui/MatchFoundOverlay';
+import { CountdownOverlay } from '@/components/game-ui/CountdownOverlay';
+import { RoundEndOverlay } from '@/components/game-ui/RoundEndOverlay';
 import { RoundStats } from '@/utils/scoring';
 
 const Index = () => {
@@ -45,7 +48,7 @@ const Index = () => {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [phase, match?.currentRound]);
+  }, [phase, match]);
 
   // Get the last round result for the overlay
   const lastRoundResult = match?.roundResults[match.roundResults.length - 1] || null;

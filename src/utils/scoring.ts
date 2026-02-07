@@ -1,3 +1,6 @@
+// scoring.ts
+// utility functions for scoring, including rating calculations and rank determination.
+
 export interface RoundStats {
   wpm: number;
   rawWpm: number;

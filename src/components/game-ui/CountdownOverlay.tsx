@@ -1,3 +1,6 @@
+// CountdownOverlay: Displays a countdown before the game starts. Used in TypingArena and MatchHUD.
+// Depends on: framer-motion, cn util.
+// Props: count, isVisible, className.
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 

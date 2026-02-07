@@ -1,3 +1,6 @@
+// MatchFoundOverlay: Overlay shown when a match is found. Used in PlayScreen.
+// Depends on: RankBadge, Player type, cn util.
+// Props: isVisible, player, opponent, onReady.
 import { motion, AnimatePresence } from 'framer-motion';
 import { RankBadge } from './RankBadge';
 import { Player } from '@/types/game';

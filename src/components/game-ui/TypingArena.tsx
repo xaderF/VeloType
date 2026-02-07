@@ -1,3 +1,6 @@
+// TypingArena: Main game area for typing matches. Uses TypingDisplay, RoundEndOverlay, CountdownOverlay.
+// Depends on: TypingDisplay, useTypingEngine, RoundStats, cn util.
+// Props: text, isActive.
 import { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TypingDisplay } from './TypingDisplay';

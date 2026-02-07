@@ -1,3 +1,9 @@
+// text.ts
+// handles text generation and manipulation for typing matches.
+// uses make_rng from seed.ts and difficulty/type definitions.
+// provides curated word lists and generates random text based on seed, length, and difficulty.
+// used in typingdisplay and engine.
+
 import { makeRng } from './seed';
 import { Difficulty } from './types';
 

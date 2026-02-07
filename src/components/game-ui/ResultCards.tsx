@@ -1,3 +1,6 @@
+// ResultCards: Shows results after a match. Used in ResultsScreen.
+// Depends on: framer-motion, cn util, RoundStats.
+// Props: label, value, suffix, highlight, delay.
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { RoundStats } from '@/utils/scoring';

@@ -1,3 +1,6 @@
+// textSeed.ts
+// utility functions for text seed generation, used in reproducible matches.
+
 import { generateText } from '@/game/engine';
 
 export interface SeededTextOptions {

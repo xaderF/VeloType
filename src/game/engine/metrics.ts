@@ -1,3 +1,7 @@
+// metrics.ts
+// calculates game metrics such as correct characters, total typed, errors, accuracy, raw wpm, wpm, consistency, and elapsed time.
+// provides functions for counting correct characters and building metrics from typing state. used by reducer and scoring modules.
+
 import { TypingState } from './types';
 
 export interface TypingMetrics {

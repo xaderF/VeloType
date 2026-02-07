@@ -1,3 +1,6 @@
+// RankBadge: Displays player rank badge. Used in MatchHUD.
+// Depends on: framer-motion, cn util, getRankFromRating, Rank.
+// Props: rating, size, showRating, className.
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { getRankFromRating, Rank } from '@/utils/scoring';

@@ -1,3 +1,6 @@
+// HealthBar: Shows player health during the match. Used in MatchHUD.
+// Depends on: framer-motion, cn util.
+// Props: current, max, showDamage, isPlayer, className.
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 

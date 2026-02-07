@@ -1,3 +1,6 @@
+// RoundEndOverlay: Overlay shown at the end of a round. Used in TypingArena.
+// Depends on: framer-motion, RoundResultCard, RoundResult, cn util.
+// Props: isVisible, roundResult, onContinue, drawAvailable.
 import { motion, AnimatePresence } from 'framer-motion';
 import { RoundResultCard } from '@/components/game/ResultCards';
 import { RoundResult } from '@/types/game';
