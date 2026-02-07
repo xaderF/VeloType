@@ -152,14 +152,14 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 
 ## Environment
 
-To run VeloType locally or deploy, copy `.env.example` to `.env` and fill in your values. Below are the required environment variables:
+To run VeloType locally or deploy, create a `.env` file at the project root and fill in your values. Below are the required environment variables:
 
 - `DATABASE_URL`: Database connection string for backend (leave blank if not used yet)
 - `AUTH_SECRET`: Secret key for authentication (leave blank if not used yet)
 - `NEXT_PUBLIC_API_URL`: Base URL for API requests from frontend (optional)
 - `NEXT_PUBLIC_ANALYTICS_ID`: Analytics or third-party integration key (optional)
 
-You can add more variables as backend features are implemented. The app will run locally with a copied `.env`, even if some features are stubbed.
+You can add more variables as backend features are implemented. The app will run locally with a project-root `.env`, even if some features are stubbed.
 
 ## Backend (Phase 2 foundation)
 

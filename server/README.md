@@ -9,7 +9,7 @@ npm install
 ```
 
 2) Env
-- Copy the root `.env.example` to `.env` and fill values.
+- Create a `.env` file in the project root and fill values.
 - Used vars: `PORT` (default 4000), `DATABASE_URL` (Postgres), `AUTH_SECRET` (optional now).
 
 3) Run
