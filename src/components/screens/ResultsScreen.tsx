@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { MatchResults } from '@/components/game/ResultCards';
-import { RankBadge } from '@/components/game/RankBadge';
+import { MatchResults } from '@/components/game-ui/ResultCards';
+import { RankBadge } from '@/components/game-ui/RankBadge';
 import { MatchState } from '@/types/game';
 import { RoundStats, getRankFromRating } from '@/utils/scoring';
 import { cn } from '@/lib/utils';

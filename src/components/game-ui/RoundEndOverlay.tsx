@@ -2,7 +2,7 @@
 // Depends on: framer-motion, RoundResultCard, RoundResult, cn util.
 // Props: isVisible, roundResult, onContinue, drawAvailable.
 import { motion, AnimatePresence } from 'framer-motion';
-import { RoundResultCard } from '@/components/game/ResultCards';
+import { RoundResultCard } from '@/components/game-ui/ResultCards';
 import { RoundResult } from '@/types/game';
 import { cn } from '@/lib/utils';
 

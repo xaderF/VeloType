@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { RankBadge } from '@/components/game/RankBadge';
+import { RankBadge } from '@/components/game-ui/RankBadge';
 import { getProgressToNextRank, getRankFromRating, RANKS } from '@/utils/scoring';
 import { cn } from '@/lib/utils';
 
