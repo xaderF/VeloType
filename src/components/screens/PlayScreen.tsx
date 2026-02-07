@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { MatchHUD } from '@/components/game-ui/MatchHUD';
 import { TypingArena } from '@/components/game-ui/TypingArena';
+import { TypingOptionsBar } from '@/components/game-ui/TypingOptionsBar';
 import { MatchState } from '@/types/game';
 import { RoundStats } from '@/utils/scoring';
 
@@ -11,6 +12,7 @@ interface PlayScreenProps {
   onRoundComplete: (stats: RoundStats) => void;
   playerDamage?: number;
   opponentDamage?: number;
+  punctuationEnabled: boolean;
 }
 
 export function PlayScreen({
@@ -20,6 +22,7 @@ export function PlayScreen({
   onRoundComplete,
   playerDamage,
   opponentDamage,
+  punctuationEnabled,
 }: PlayScreenProps) {
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-grid-pattern relative">
@@ -43,16 +46,11 @@ export function PlayScreen({
           />
         </motion.div>
 
-        {/* Phrase Type Selection */}
-        <div className="mb-4 flex justify-center">
-          <select className="px-3 py-2 rounded border bg-background text-foreground" style={{ minWidth: 180 }}>
-            <option value="words">Words</option>
-            <option value="quote">Quote</option>
-            <option value="punctuation">Punctuation</option>
-            <option value="numbers">Numbers</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
+        <TypingOptionsBar
+          punctuationEnabled={punctuationEnabled}
+          timeLimit={match.roundTimeSeconds}
+        />
+
         {/* Typing Arena */}
         <div className="flex-1 flex items-center">
           <TypingArena

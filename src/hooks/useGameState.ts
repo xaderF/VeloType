@@ -21,6 +21,11 @@ interface UseGameStateProps {
   username?: string;
 }
 
+export interface PracticeSettings {
+  punctuation: boolean;
+  timeLimitSeconds: 15 | 30 | 60 | 120;
+}
+
 export function useGameState({
   initialRating = 1100,
   username = 'Player',
@@ -33,6 +38,10 @@ export function useGameState({
   const [playerRating, setPlayerRating] = useState(initialRating);
   const [drawOffered, setDrawOffered] = useState(false);
   const [drawAccepted, setDrawAccepted] = useState(false);
+  const [practiceSettings, setPracticeSettings] = useState<PracticeSettings>({
+    punctuation: false,
+    timeLimitSeconds: 30,
+  });
   
   const queueTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -83,10 +92,13 @@ export function useGameState({
         currentRound: 1,
         maxRounds: 15,
         roundResults: [],
-        roundTimeSeconds: 30,
+        roundTimeSeconds: practiceSettings.timeLimitSeconds,
         status: 'waiting',
         winner: null,
         textSeed: seed,
+        textSettings: {
+          punctuation: practiceSettings.punctuation,
+        },
       });
 
       setDrawOffered(false);
@@ -100,7 +112,7 @@ export function useGameState({
         setCountdown(3);
       }, 2500);
     }, matchDelay);
-  }, [playerRating, player]);
+  }, [playerRating, player, practiceSettings]);
 
   // Cancel queue
   const cancelQueue = useCallback(() => {
@@ -290,8 +302,20 @@ export function useGameState({
     return getSeededText(`${match.textSeed}-${match.currentRound}`, {
       length: Math.max(200, match.roundTimeSeconds * 8),
       difficulty: 'medium',
+      includePunctuation: match.textSettings.punctuation,
     });
   }, [match]);
+
+  const updatePracticeSettings = useCallback((next: Partial<PracticeSettings>) => {
+    setPracticeSettings((prev) => {
+      const time = next.timeLimitSeconds ?? prev.timeLimitSeconds;
+      const safeTime = [15, 30, 60, 120].includes(time) ? time : prev.timeLimitSeconds;
+      return {
+        punctuation: next.punctuation ?? prev.punctuation,
+        timeLimitSeconds: safeTime as PracticeSettings['timeLimitSeconds'],
+      };
+    });
+  }, []);
 
   // Play again
   const playAgain = useCallback(() => {
@@ -332,5 +356,7 @@ export function useGameState({
     getEloChange,
     drawOffered,
     drawAccepted,
+    practiceSettings,
+    updatePracticeSettings,
   };
 }

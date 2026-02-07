@@ -34,6 +34,9 @@ export interface MatchState {
   status: 'waiting' | 'countdown' | 'typing' | 'round_end' | 'match_end';
   winner: 'player' | 'opponent' | 'draw' | null;
   textSeed: number;
+  textSettings: {
+    punctuation: boolean;
+  };
 }
 
 export type GamePhase = 
@@ -44,4 +47,6 @@ export type GamePhase =
   | 'playing'
   | 'round_end'
   | 'match_end'
-  | 'results';
+  | 'results'
+  | 'practice'
+  | 'practice_results';

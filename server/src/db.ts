@@ -1,14 +1,21 @@
 import { PrismaClient } from '@prisma/client';
+import { env } from './env.js';
 
-export const prisma = new PrismaClient();
+export const prisma = env.DATABASE_URL ? new PrismaClient() : null;
+export const isDatabaseEnabled = prisma !== null;
+
+async function disconnectPrisma() {
+  if (!prisma) return;
+  await prisma.$disconnect();
+}
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  await prisma.$disconnect();
+  await disconnectPrisma();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
+  await disconnectPrisma();
   process.exit(0);
 });

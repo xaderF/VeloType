@@ -13,6 +13,10 @@ interface TypingArenaProps {
   isActive: boolean;
   timeLimit?: number;
   onComplete?: (stats: RoundStats) => void;
+  /** Called alongside onComplete with the raw typed string and per-second samples (for online mode) */
+  onCompleteRaw?: (typed: string, samples: number[]) => void;
+  /** Called every ~500ms with the current typing state (for online progress reporting) */
+  onProgressUpdate?: (typed: string, cursor: number, errors: number, startedAtMs: number | null) => void;
   className?: string;
 }
 
@@ -21,6 +25,8 @@ export function TypingArena({
   isActive,
   timeLimit = 30,
   onComplete,
+  onCompleteRaw,
+  onProgressUpdate,
   className,
 }: TypingArenaProps) {
   const {
@@ -59,6 +65,23 @@ export function TypingArena({
       inputRef.current?.focus();
     }
   }, [isActive, inputRef]);
+
+  // Report raw typed text + samples when finished (online mode)
+  useEffect(() => {
+    if (state.status === 'finished' && onCompleteRaw) {
+      onCompleteRaw(state.typed, state.samples);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status]);
+
+  // Report progress periodically (online mode)
+  useEffect(() => {
+    if (!isActive || !onProgressUpdate || state.status === 'finished') return;
+    const id = setInterval(() => {
+      onProgressUpdate(state.typed, state.cursor, state.errors, state.startedAtMs);
+    }, 500);
+    return () => clearInterval(id);
+  }, [isActive, onProgressUpdate, state.typed, state.cursor, state.errors, state.startedAtMs, state.status]);
 
   return (
     <motion.div

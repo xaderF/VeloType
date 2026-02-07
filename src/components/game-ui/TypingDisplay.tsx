@@ -1,7 +1,6 @@
 // TypingDisplay: Displays the text to be typed. Used in TypingArena.
-// Depends on: framer-motion, cn util.
+// Depends on: cn util.
 // Props: text, typed, currentIndex, className.
-import { motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +12,6 @@ interface TypingDisplayProps {
 }
 
 export function TypingDisplay({ text, typed, currentIndex, className }: TypingDisplayProps) {
-
   const words = text.split(/(\s+)/); // Split by spaces, keep spaces
   const currentRef = useRef<HTMLSpanElement | null>(null);
 
@@ -46,14 +44,12 @@ export function TypingDisplay({ text, typed, currentIndex, className }: TypingDi
                 charClass = 'text-typing-correct';
               } else if (hasTyped && typedChar !== char) {
                 charClass = 'text-typing-error';
-              } else if (isCurrentChar) {
-                charClass = 'text-typing-current';
               }
 
               charIndex++;
 
               return (
-                <span key={cIdx} className="relative inline">
+                <span key={cIdx} className="relative inline-block">
                   <span
                     ref={isCurrentChar ? currentRef : null}
                     className={cn(charClass, "transition-colors duration-75")}
@@ -61,12 +57,8 @@ export function TypingDisplay({ text, typed, currentIndex, className }: TypingDi
                     {char === ' ' ? '\u00A0' : char}
                   </span>
                   {isCurrentChar && (
-                    <motion.span
-                      className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-primary"
-                      layoutId="cursor"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.1 }}
+                    <span
+                      className="typing-caret absolute left-[-0.08em] top-[0.12em] h-[1.05em] w-[2px] rounded-full bg-primary"
                     />
                   )}
                 </span>

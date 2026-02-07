@@ -8,10 +8,16 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * Score = wpm × accuracy² × consistencyBonus
+ *
+ * Accuracy is squared so errors are penalised steeply (MonkeyType-style).
+ * Consistency adds a small 0.9–1.0 multiplier.
+ */
 export function performanceScore({ wpm, accuracy, consistency }: Pick<RoundResult, 'wpm' | 'accuracy' | 'consistency'>): number {
-  const accuracyFactor = 0.6 + 0.4 * accuracy;
-  const consistencyFactor = 0.7 + 0.3 * consistency;
-  return wpm * accuracyFactor * consistencyFactor;
+  const accuracyPenalty = accuracy * accuracy; // 0–1, squared
+  const consistencyBonus = 0.9 + 0.1 * consistency; // 0.9–1.0
+  return wpm * accuracyPenalty * consistencyBonus;
 }
 
 export function damageFromScores(scoreA: number, scoreB: number, maxDamagePerRound = 35): number {
