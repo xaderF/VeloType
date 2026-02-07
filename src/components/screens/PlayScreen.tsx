@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { MatchHUD } from '@/components/game/MatchHUD';
-import { TypingArena } from '@/components/game/TypingArena';
+import { MatchHUD } from '@/components/game-ui/MatchHUD';
+import { TypingArena } from '@/components/game-ui/TypingArena';
 import { MatchState } from '@/types/game';
 import { RoundStats } from '@/utils/scoring';
 

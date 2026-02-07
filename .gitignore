@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Builds
+/dist/
+server/dist/
+.vite/
+
+# Env
+.env
+.env.*
+server/.env
+
+# Tests/coverage
+coverage/
+
+# OS/editor
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*

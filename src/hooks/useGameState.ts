@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { GamePhase, Player, RoundResult, MatchState } from '@/types/game';
 import { RoundStats, calculateEloChange, getRankFromRating } from '@/utils/scoring';
 import { performanceScore, damageFromScores } from '@/game/match';
@@ -37,15 +37,15 @@ export function useGameState({
   const queueTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Create player object
-  const player: Player = {
+  // Create player object (memoized to keep stable reference for hooks)
+  const player: Player = useMemo(() => ({
     id: '1',
     username,
     rating: playerRating,
     rank: getRankFromRating(playerRating).rank,
     hp: match?.player.hp ?? 100,
     maxHp: 100,
-  };
+  }), [match?.player.hp, playerRating, username]);
 
   // Start queue
   const startQueue = useCallback(() => {

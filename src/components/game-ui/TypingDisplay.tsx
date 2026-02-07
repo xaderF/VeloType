@@ -12,6 +12,8 @@ interface TypingDisplayProps {
   className?: string;
 }
 
+export function TypingDisplay({ text, typed, currentIndex, className }: TypingDisplayProps) {
+
   const words = text.split(/(\s+)/); // Split by spaces, keep spaces
   const currentRef = useRef<HTMLSpanElement | null>(null);
 

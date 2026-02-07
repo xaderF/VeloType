@@ -160,3 +160,16 @@ To run VeloType locally or deploy, copy `.env.example` to `.env` and fill in you
 - `NEXT_PUBLIC_ANALYTICS_ID`: Analytics or third-party integration key (optional)
 
 You can add more variables as backend features are implemented. The app will run locally with a copied `.env`, even if some features are stubbed.
+
+## Backend (Phase 2 foundation)
+
+Server scaffold lives in [server/README.md](server/README.md).
+
+Quick start:
+
+- Install: `cd server && npm install`
+- Run dev server: `npm run dev` (default port 4000)
+- Env used: `PORT` (default 4000), `DATABASE_URL` (optional now), `AUTH_SECRET` (optional now)
+- Endpoints (stub): GET /health, POST /auth/login, GET /profile, WS /ws/matchmaking
+
+Matchmaking (current): in-memory ranked queue with expanding rating window; emits `MATCH_FOUND` { matchId, seed, config, startAt }. If `DATABASE_URL` (Postgres) is set and migrations run, matches are persisted via Prisma.

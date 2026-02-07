@@ -32,7 +32,7 @@ export interface MatchState {
   roundResults: RoundResult[];
   roundTimeSeconds: number;
   status: 'waiting' | 'countdown' | 'typing' | 'round_end' | 'match_end';
-  winner: 'player' | 'opponent' | null;
+  winner: 'player' | 'opponent' | 'draw' | null;
   textSeed: number;
 }
 
