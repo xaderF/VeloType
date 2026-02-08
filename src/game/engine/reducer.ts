@@ -21,6 +21,8 @@ export function createTypingState(target: string, options: TypingOptions): Typin
     mode: options.mode,
     limit: options.limit,
     errors: 0,
+    totalErrors: 0,
+    totalKeystrokes: 0,
     samples: [],
     lastSampleMs: null,
   };
@@ -98,12 +100,16 @@ export function typingReducer(state: TypingState, action: TypingAction): TypingS
       const typed = `${state.typed}${action.payload.char}`;
       const cursor = state.cursor + 1;
       const errors = isCorrect ? state.errors : state.errors + 1;
+      const totalErrors = isCorrect ? state.totalErrors : state.totalErrors + 1;
+      const totalKeystrokes = state.totalKeystrokes + 1;
 
       const updated: TypingState = {
         ...state,
         typed,
         cursor,
         errors,
+        totalErrors,
+        totalKeystrokes,
         status,
         startedAtMs,
         endedAtMs: null,
@@ -135,6 +141,18 @@ export function typingReducer(state: TypingState, action: TypingAction): TypingS
 
     case 'TICK': {
       const nowMs = action.payload.nowMs;
+
+      // In timed mode, the clock should start when the round starts, not on first keystroke.
+      if (state.mode === 'time' && state.status === 'idle' && state.startedAtMs === null) {
+        const started: TypingState = {
+          ...state,
+          status: 'running',
+          startedAtMs: nowMs,
+          lastSampleMs: nowMs,
+        };
+        return finalizeIfComplete(started, nowMs);
+      }
+
       const sampled = addSample(state, nowMs);
       return finalizeIfComplete(sampled, nowMs);
     }

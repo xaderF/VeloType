@@ -4,6 +4,7 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { RoundStats } from '@/utils/scoring';
+import { WpmChart } from './WpmChart';
 
 /* ---------- small stat (secondary row) ---------- */
 
@@ -24,7 +25,7 @@ function SmallStat({ label, value, delay = 0 }: SmallStatProps) {
       <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
         {label}
       </div>
-      <div className="text-lg font-bold font-mono">{value}</div>
+      <div className="text-xl font-bold font-mono">{value}</div>
     </motion.div>
   );
 }
@@ -33,6 +34,8 @@ interface RoundResultCardProps {
   roundNumber: number;
   playerStats: RoundStats;
   opponentStats: RoundStats;
+  playerScore: number;
+  opponentScore: number;
   damageDealt: number;
   damageTaken: number;
   winner: 'player' | 'opponent' | 'draw';
@@ -43,6 +46,8 @@ export function RoundResultCard({
   roundNumber,
   playerStats,
   opponentStats,
+  playerScore,
+  opponentScore,
   damageDealt,
   damageTaken,
   winner,
@@ -50,6 +55,7 @@ export function RoundResultCard({
 }: RoundResultCardProps) {
   const isPlayerWinner = winner === 'player';
   const isOpponentWinner = winner === 'opponent';
+  const scoreDelta = Math.round(playerScore - opponentScore);
 
   return (
     <motion.div
@@ -87,13 +93,13 @@ export function RoundResultCard({
         )}>
           <div className="text-sm font-medium mb-3 text-center">You</div>
           <div className="text-center mb-1">
-            <div className="text-3xl font-bold font-mono text-primary">
+            <div className="text-4xl font-bold font-mono text-primary">
               {Math.round(playerStats.wpm)}
             </div>
             <div className="text-xs text-muted-foreground">wpm</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold font-mono">
+            <div className="text-2xl font-bold font-mono">
               {Math.round(playerStats.accuracy * 100)}%
             </div>
             <div className="text-xs text-muted-foreground">acc</div>
@@ -117,13 +123,13 @@ export function RoundResultCard({
         )}>
           <div className="text-sm font-medium mb-3 text-center">Opponent</div>
           <div className="text-center mb-1">
-            <div className="text-3xl font-bold font-mono text-primary">
+            <div className="text-4xl font-bold font-mono text-primary">
               {Math.round(opponentStats.wpm)}
             </div>
             <div className="text-xs text-muted-foreground">wpm</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold font-mono">
+            <div className="text-2xl font-bold font-mono">
               {Math.round(opponentStats.accuracy * 100)}%
             </div>
             <div className="text-xs text-muted-foreground">acc</div>
@@ -138,6 +144,27 @@ export function RoundResultCard({
               -{damageTaken} damage taken
             </motion.div>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card/70 px-4 py-3">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>Score</span>
+          <span
+            className={cn(
+              "font-mono font-semibold",
+              scoreDelta > 0 && "text-hp-full",
+              scoreDelta < 0 && "text-damage",
+              scoreDelta === 0 && "text-muted-foreground"
+            )}
+          >
+            {scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta}
+          </span>
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <div className="text-xl font-bold font-mono text-foreground">{Math.round(playerScore)}</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">vs</div>
+          <div className="text-xl font-bold font-mono text-foreground">{Math.round(opponentScore)}</div>
         </div>
       </div>
     </motion.div>
@@ -222,7 +249,7 @@ export function MatchResults({
             <div className="text-sm font-medium text-muted-foreground tracking-wider mb-1">
               wpm
             </div>
-            <div className="text-6xl font-bold font-mono text-primary text-glow-primary leading-none">
+            <div className="text-7xl font-bold font-mono text-primary text-glow-primary leading-none">
               {Math.round(playerStats.wpm)}
             </div>
           </motion.div>
@@ -236,12 +263,24 @@ export function MatchResults({
             <div className="text-sm font-medium text-muted-foreground tracking-wider mb-1">
               acc
             </div>
-            <div className="text-6xl font-bold font-mono text-primary leading-none">
+            <div className="text-7xl font-bold font-mono text-primary leading-none">
               {Math.round(playerStats.accuracy * 100)}
-              <span className="text-3xl">%</span>
+              <span className="text-4xl">%</span>
             </div>
           </motion.div>
         </div>
+
+        {/* WPM Chart */}
+        {playerStats.wpmHistory && playerStats.wpmHistory.length > 1 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.42, duration: 0.3 }}
+            className="pt-4"
+          >
+            <WpmChart data={playerStats.wpmHistory} className="h-[200px]" />
+          </motion.div>
+        )}
 
         {/* Secondary stats row */}
         <div className="flex items-center gap-8 pt-4 border-t border-border/50">
@@ -252,7 +291,12 @@ export function MatchResults({
           />
           <SmallStat
             label="characters"
-            value={`${playerStats.correctCharacters}/${playerStats.errors}/0`}
+            value={(() => {
+              const corrected = (playerStats.totalErrors ?? 0) - playerStats.errors;
+              return corrected > 0
+                ? `${playerStats.correctCharacters}/${playerStats.errors}/${corrected}`
+                : `${playerStats.correctCharacters}/${playerStats.errors}`;
+            })()}
             delay={0.5}
           />
           <SmallStat
@@ -262,7 +306,7 @@ export function MatchResults({
           />
           <SmallStat
             label="errors"
-            value={playerStats.errors}
+            value={playerStats.totalErrors ?? playerStats.errors}
             delay={0.6}
           />
         </div>

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
-import { RoundStats } from '@/utils/scoring';
+import { RoundStats, WpmHistoryPoint } from '@/utils/scoring';
 import {
   TypingMode,
   createTypingState,
   typingReducer,
   buildMetrics,
 } from '@/game/engine';
-import { computeWpm, computeRawWpm } from '@/game/engine/metrics';
+import { computeWpm, computeRawWpm, countCorrectChars } from '@/game/engine/metrics';
 
 interface UseTypingEngineProps {
   text: string;
@@ -15,6 +15,8 @@ interface UseTypingEngineProps {
   mode?: TypingMode;
   onComplete?: (stats: RoundStats) => void;
   timeLimit?: number; // in seconds
+  /** When true, the timer won't start until the first keystroke (MonkeyType-style) */
+  startOnFirstKeystroke?: boolean;
 }
 
 export function useTypingEngine({
@@ -23,9 +25,12 @@ export function useTypingEngine({
   mode = 'time',
   onComplete,
   timeLimit = 30,
+  startOnFirstKeystroke = false,
 }: UseTypingEngineProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasReported = useRef(false);
+  const wpmHistoryRef = useRef<WpmHistoryPoint[]>([]);
+  const lastHistoryLen = useRef(0);
 
   const [state, dispatch] = useReducer(
     typingReducer,
@@ -39,6 +44,8 @@ export function useTypingEngine({
   // Reset when text or mode changes
   useEffect(() => {
     hasReported.current = false;
+    wpmHistoryRef.current = [];
+    lastHistoryLen.current = 0;
     dispatch({
       type: 'RESET',
       payload: {
@@ -58,12 +65,37 @@ export function useTypingEngine({
     return () => clearInterval(interval);
   }, [isActive, state.status]);
 
+  // Start timed rounds immediately (without waiting for first keypress),
+  // unless startOnFirstKeystroke is set (used by practice / free-type mode).
+  useEffect(() => {
+    if (startOnFirstKeystroke) return; // skip auto-start
+    if (!isActive || mode !== 'time') return;
+    if (state.status !== 'idle' || state.startedAtMs !== null) return;
+    dispatch({ type: 'TICK', payload: { nowMs: Date.now() } });
+  }, [isActive, mode, state.status, state.startedAtMs, startOnFirstKeystroke]);
+
   // Focus input when active
   useEffect(() => {
     if (isActive && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isActive]);
+
+  // Collect per-second WPM history for charts
+  useEffect(() => {
+    if (state.samples.length > lastHistoryLen.current && state.startedAtMs !== null) {
+      const second = state.samples.length;
+      const elapsedMs = second * 1000;
+      const correct = countCorrectChars(state.target, state.typed);
+      const wpm = computeWpm(correct, elapsedMs);
+      const raw = computeRawWpm(state.typed.length, elapsedMs);
+      wpmHistoryRef.current = [
+        ...wpmHistoryRef.current,
+        { second, wpm: Math.round(wpm), raw: Math.round(raw), errors: state.errors },
+      ];
+      lastHistoryLen.current = state.samples.length;
+    }
+  }, [state.samples.length, state.target, state.typed, state.errors, state.startedAtMs]);
 
   // Notify completion exactly once
   useEffect(() => {
@@ -82,8 +114,10 @@ export function useTypingEngine({
       accuracy: metrics.accuracy,
       consistency: metrics.consistency,
       errors: metrics.errors,
+      totalErrors: metrics.totalErrors,
       charactersTyped: metrics.totalTyped,
       correctCharacters: metrics.correctChars,
+      wpmHistory: [...wpmHistoryRef.current],
     };
     onComplete?.(stats);
   }, [state, onComplete, mode, timeLimit]);

@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import { MatchHistoryList, MatchDetailView } from "./pages/MatchHistory";
+import DailyChallenge from "./pages/DailyChallenge";
+import Leaderboard from "./pages/Leaderboard";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +23,8 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/history" element={<MatchHistoryList />} />
           <Route path="/history/:matchId" element={<MatchDetailView />} />
+          <Route path="/daily" element={<DailyChallenge />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

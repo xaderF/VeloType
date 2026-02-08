@@ -64,7 +64,10 @@ export async function authRoutes(app: FastifyInstance) {
 
   const db = prisma;
 
-  app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
+  // Stricter rate limits for auth endpoints: 10 attempts per minute per IP
+  const authRateConfig = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
+
+  app.post('/auth/register', authRateConfig, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Invalid payload' });
@@ -110,7 +113,7 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/auth/login', authRateConfig, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Invalid payload' });

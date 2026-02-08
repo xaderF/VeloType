@@ -19,6 +19,7 @@ model User {
   updatedAt    DateTime       @updatedAt
   rating       Rating?
   matches      MatchPlayer[]
+  dailyScores  DailyScore[]
 
   @@unique([oauthProvider, oauthSubject])
 }
@@ -69,4 +70,24 @@ model MatchPlayer {
 
   @@index([matchId])
   @@index([userId])
+}
+
+model DailyScore {
+  id           String   @id @default(uuid())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  date         String   // YYYY-MM-DD, the daily challenge date
+  seed         String   // the deterministic seed for this day
+  wpm          Float
+  rawWpm       Float
+  accuracy     Float
+  consistency  Float
+  score        Float    // performanceScore for ranking
+  correctChars Int
+  totalTyped   Int
+  errors       Int
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, date]) // one attempt per user per day
+  @@index([date, score])   // fast leaderboard queries
 }

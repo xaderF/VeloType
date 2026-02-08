@@ -100,6 +100,9 @@ export function HomeScreen({ username, rating, onPlayRanked }: HomeScreenProps) 
             <Link to="/history" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
               Match History
             </Link>
+            <Link to="/leaderboard" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
+              Leaderboard
+            </Link>
           </motion.div>
         )}
       </motion.div>

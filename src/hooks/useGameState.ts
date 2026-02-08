@@ -161,6 +161,7 @@ export function useGameState({
       accuracy,
       consistency,
       errors,
+      totalErrors: errors,
       charactersTyped,
       correctCharacters,
     };
@@ -169,6 +170,8 @@ export function useGameState({
   // Handle round completion
   const handleRoundComplete = useCallback((playerStats: RoundStats) => {
     if (!match) return;
+
+    console.log('[handleRoundComplete] wpmHistory length:', playerStats.wpmHistory?.length ?? 0);
 
     setRoundStats(playerStats);
     

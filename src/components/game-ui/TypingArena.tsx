@@ -17,6 +17,10 @@ interface TypingArenaProps {
   onCompleteRaw?: (typed: string, samples: number[]) => void;
   /** Called every ~500ms with the current typing state (for online progress reporting) */
   onProgressUpdate?: (typed: string, cursor: number, errors: number, startedAtMs: number | null) => void;
+  /** Hide distracting UI for a clean, Monkeytype-style focus experience */
+  focusMode?: boolean;
+  /** Timer starts on first keystroke instead of immediately (used by free type) */
+  startOnFirstKeystroke?: boolean;
   className?: string;
 }
 
@@ -27,6 +31,8 @@ export function TypingArena({
   onComplete,
   onCompleteRaw,
   onProgressUpdate,
+  focusMode = false,
+  startOnFirstKeystroke: startOnFirstKeystrokeProp,
   className,
 }: TypingArenaProps) {
   const {
@@ -41,6 +47,7 @@ export function TypingArena({
     isActive,
     onComplete,
     timeLimit,
+    startOnFirstKeystroke: startOnFirstKeystrokeProp ?? focusMode,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,7 +95,7 @@ export function TypingArena({
       ref={containerRef}
       className={cn(
         "relative w-full cursor-text",
-        !isActive && "opacity-50 pointer-events-none",
+        !isActive && "pointer-events-none",
         className
       )}
       initial={{ opacity: 0, y: 20 }}
@@ -105,58 +112,79 @@ export function TypingArena({
       />
 
       {/* Typing area */}
-      <div className="p-8 rounded-xl border border-border bg-card">
-        {/* Live stats bar */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold font-mono text-primary">
-                {Math.round(metrics.wpm) || 0}
+      <div className={cn(
+        "p-8 rounded-xl",
+        !focusMode && "border border-border bg-card",
+      )}>
+        {/* Live stats bar — hidden in focus mode */}
+        {!focusMode && (
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+            <div className="flex items-center gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold font-mono text-primary">
+                  {Math.round(metrics.wpm) || 0}
+                </div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                  WPM
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">
-                WPM
+              <div className="text-center">
+                <div className="text-2xl font-bold font-mono">
+                  {accuracyPercent}%
+                </div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Accuracy
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold font-mono text-damage">
+                  {metrics.errors || 0}
+                </div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Errors
+                </div>
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold font-mono">
-                {accuracyPercent}%
+            
+            <div className="text-right">
+              <div className="text-xl font-bold font-mono text-primary">
+                {timeRemaining}s
               </div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">
-                Accuracy
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold font-mono text-damage">
-                {metrics.errors || 0}
-              </div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">
-                Errors
+              <div className="text-xs text-muted-foreground">
+                {state.cursor} / {state.target.length} chars
               </div>
             </div>
           </div>
-          
-          {/* Progress indicator */}
-          <div className="text-sm text-muted-foreground">
-            {state.cursor} / {state.target.length} characters
+        )}
+
+        {/* Focus mode: minimal timer only */}
+        {focusMode && state.startedAtMs && state.status !== 'finished' && (
+          <div className="mb-6 text-center">
+            <span className="text-4xl font-mono font-bold text-primary">
+              {timeRemaining}
+            </span>
           </div>
-        </div>
+        )}
 
         {/* Text display */}
         <TypingDisplay
           text={state.target}
           typed={state.typed}
           currentIndex={state.cursor}
+          textSize={focusMode ? "text-3xl md:text-4xl" : undefined}
           className="min-h-[120px]"
         />
 
-        {/* Progress bar */}
-        <div className="mt-6 h-1 bg-secondary rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-primary"
-            style={{ width: `${progress}%` }}
-            transition={{ duration: 0.1 }}
-          />
-        </div>
+        {/* Progress bar — hidden in focus mode */}
+        {!focusMode && (
+          <div className="mt-6 h-1 bg-secondary rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-primary"
+              style={{ width: `${progress}%` }}
+              transition={{ duration: 0.1 }}
+            />
+          </div>
+        )}
 
         {/* Focus hint */}
         {isActive && !state.startedAtMs && (
@@ -170,8 +198,8 @@ export function TypingArena({
           </motion.div>
         )}
 
-        {/* Completion message */}
-        {state.status === 'finished' && (
+        {/* Completion message — only in non-focus mode */}
+        {!focusMode && state.status === 'finished' && (
           <motion.div
             className="mt-4 text-center text-hp-full font-semibold"
             initial={{ opacity: 0, scale: 0.8 }}

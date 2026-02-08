@@ -8,6 +8,10 @@ export interface TypingMetrics {
   correctChars: number;
   totalTyped: number;
   errors: number;
+  /** Cumulative errors including corrected ones */
+  totalErrors: number;
+  /** Total keystrokes ever typed (not counting backspace) */
+  totalKeystrokes: number;
   accuracy: number;
   rawWpm: number;
   wpm: number;
@@ -60,7 +64,11 @@ export function buildMetrics(state: TypingState, nowMs: number): TypingMetrics {
     : 0;
   const correctChars = countCorrectChars(state.target, state.typed);
   const totalTyped = state.typed.length;
-  const accuracy = computeAccuracy(correctChars, totalTyped);
+  // Accuracy uses totalKeystrokes (all keys ever pressed) and totalErrors
+  // so corrected mistakes still count against accuracy.
+  const accuracy = state.totalKeystrokes > 0
+    ? computeAccuracy(state.totalKeystrokes - state.totalErrors, state.totalKeystrokes)
+    : computeAccuracy(correctChars, totalTyped);
   const rawWpm = computeRawWpm(totalTyped, elapsedMs);
   const wpm = computeWpm(correctChars, elapsedMs);
   const consistency = computeConsistency(state.samples);
@@ -69,6 +77,8 @@ export function buildMetrics(state: TypingState, nowMs: number): TypingMetrics {
     correctChars,
     totalTyped,
     errors: state.errors,
+    totalErrors: state.totalErrors,
+    totalKeystrokes: state.totalKeystrokes,
     accuracy,
     rawWpm,
     wpm,

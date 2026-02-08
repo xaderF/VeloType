@@ -40,7 +40,7 @@ export function MatchHUD({
           <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1">
             Round
           </div>
-          <div className="text-2xl font-bold font-mono">
+          <div className="text-3xl font-bold font-mono">
             {currentRound}/{maxRounds}
           </div>
         </motion.div>
@@ -58,7 +58,7 @@ export function MatchHUD({
         >
           <div className="text-xs uppercase tracking-widest mb-1">Time</div>
           <div className={cn(
-            "text-3xl font-bold font-mono",
+            "text-4xl font-bold font-mono",
             timeRemaining <= 10 && "text-glow-damage"
           )}>
             {timeRemaining}
@@ -76,7 +76,7 @@ export function MatchHUD({
           transition={{ delay: 0.2 }}
         >
           <div className="flex items-center gap-3">
-            <div className="text-lg font-semibold">{player.username}</div>
+            <div className="text-xl font-semibold">{player.username}</div>
             <RankBadge rating={player.rating} size="sm" />
           </div>
           <HealthBar
@@ -96,7 +96,7 @@ export function MatchHUD({
         >
           <div className="flex items-center justify-end gap-3">
             <RankBadge rating={opponent.rating} size="sm" />
-            <div className="text-lg font-semibold">{opponent.username}</div>
+            <div className="text-xl font-semibold">{opponent.username}</div>
           </div>
           <HealthBar
             current={opponent.hp}

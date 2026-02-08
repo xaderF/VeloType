@@ -118,7 +118,7 @@ export function ResultsScreen({
         <motion.button
           onClick={onPlayAgain}
           className={cn(
-            "w-full py-4 px-8 rounded-xl font-bold text-lg",
+            "w-full py-4 px-8 rounded-xl font-bold text-xl",
             "bg-primary text-primary-foreground",
             "glow-primary hover:glow-primary-intense",
             "transition-all duration-300"

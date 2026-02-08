@@ -8,10 +8,12 @@ interface TypingDisplayProps {
   text: string;
   typed: string;
   currentIndex: number;
+  /** Override font size classes (defaults to 'text-2xl md:text-3xl') */
+  textSize?: string;
   className?: string;
 }
 
-export function TypingDisplay({ text, typed, currentIndex, className }: TypingDisplayProps) {
+export function TypingDisplay({ text, typed, currentIndex, textSize, className }: TypingDisplayProps) {
   const words = text.split(/(\s+)/); // Split by spaces, keep spaces
   const currentRef = useRef<HTMLSpanElement | null>(null);
 
@@ -25,7 +27,8 @@ export function TypingDisplay({ text, typed, currentIndex, className }: TypingDi
   return (
     <div
       className={cn(
-        "relative font-mono text-2xl md:text-3xl leading-relaxed select-none break-words whitespace-pre-wrap overflow-hidden",
+        "relative font-mono leading-relaxed select-none break-words whitespace-pre-wrap overflow-hidden",
+        textSize ?? "text-2xl md:text-3xl",
         className
       )}
     >

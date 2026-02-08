@@ -16,6 +16,7 @@ import { TypingOptionsBar } from '@/components/game-ui/TypingOptionsBar';
 import { RoundStats, getRankFromRating } from '@/utils/scoring';
 import { TypingArena } from '@/components/game-ui/TypingArena';
 import { RankBadge } from '@/components/game-ui/RankBadge';
+import { WpmChart } from '@/components/game-ui/WpmChart';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { getSeededText, generateMatchSeed } from '@/utils/textSeed';
@@ -127,6 +128,7 @@ function OnlinePlayScreen({
   onComplete,
   onCompleteRaw,
   onProgressUpdate,
+  onForfeit,
 }: {
   targetText: string;
   timeLimit: number;
@@ -137,8 +139,10 @@ function OnlinePlayScreen({
   onComplete: (stats: RoundStats) => void;
   onCompleteRaw: (typed: string, samples: number[]) => void;
   onProgressUpdate: (typed: string, cursor: number, errors: number, startedAtMs: number | null) => void;
+  onForfeit?: () => void;
 }) {
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
+  const [showForfeitDialog, setShowForfeitDialog] = useState(false);
 
   useEffect(() => {
     setTimeRemaining(timeLimit);
@@ -151,6 +155,63 @@ function OnlinePlayScreen({
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-grid-pattern relative">
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+
+      {/* Forfeit button — top left */}
+      {onForfeit && (
+        <motion.button
+          onClick={() => setShowForfeitDialog(true)}
+          className="absolute top-4 left-4 z-20 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          ✕ Forfeit
+        </motion.button>
+      )}
+
+      {/* Forfeit confirmation dialog */}
+      <AnimatePresence>
+        {showForfeitDialog && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="w-full max-w-sm p-6 rounded-2xl border-2 border-destructive/50 bg-card shadow-2xl space-y-5"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', bounce: 0.3 }}
+            >
+              <div className="text-center space-y-2">
+                <div className="text-2xl font-bold text-destructive">Forfeit Match?</div>
+                <div className="text-sm text-muted-foreground">
+                  This will count as a loss and you'll lose rating points.
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowForfeitDialog(false)}
+                  className="flex-1 py-3 rounded-xl border border-border bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors"
+                >
+                  Keep Playing
+                </button>
+                <button
+                  onClick={() => {
+                    setShowForfeitDialog(false);
+                    onForfeit?.();
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-destructive text-destructive-foreground font-semibold hover:bg-destructive/90 transition-colors"
+                >
+                  Forfeit
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
         {/* Minimal HUD */}
@@ -223,7 +284,7 @@ function OnlineResultsScreen({
         {/* Result banner */}
         <motion.h1
           className={cn(
-            'text-5xl font-bold text-center',
+            'text-6xl font-bold text-center',
             isWin ? 'text-hp-full' : isDraw ? 'text-muted-foreground' : 'text-damage',
           )}
           initial={{ opacity: 0, scale: 0.8 }}
@@ -242,17 +303,17 @@ function OnlineResultsScreen({
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-xs text-muted-foreground mb-1">You</div>
-              <div className="text-2xl font-bold font-mono text-primary">{Math.round(my.wpm)}</div>
+              <div className="text-4xl font-bold font-mono text-primary">{Math.round(my.wpm)}</div>
               <div className="text-xs text-muted-foreground">WPM</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">vs</div>
-              <div className="text-2xl font-bold font-mono">{Math.round((my.accuracy ?? 0) * 100)}%</div>
+              <div className="text-3xl font-bold font-mono">{Math.round((my.accuracy ?? 0) * 100)}%</div>
               <div className="text-xs text-muted-foreground">Your Acc</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">{opponent?.username ?? 'Opponent'}</div>
-              <div className="text-2xl font-bold font-mono text-destructive">{Math.round(opp.wpm)}</div>
+              <div className="text-4xl font-bold font-mono text-destructive">{Math.round(opp.wpm)}</div>
               <div className="text-xs text-muted-foreground">WPM</div>
             </div>
           </div>
@@ -268,7 +329,7 @@ function OnlineResultsScreen({
         {/* Play again */}
         <motion.button
           onClick={onPlayAgain}
-          className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-lg"
+          className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
@@ -298,6 +359,7 @@ const Index = () => {
   const [practiceTimeLimit, setPracticeTimeLimit] = useState<15 | 30 | 60 | 120>(30);
   const [practicePunctuation, setPracticePunctuation] = useState(false);
   const [practiceKey, setPracticeKey] = useState(0); // forces TypingArena remount
+  const [practiceStarted, setPracticeStarted] = useState(false); // true once first key pressed
 
   // Offline (simulated) game state
   const offline = useGameState({
@@ -347,6 +409,7 @@ const Index = () => {
     setPracticeText(text);
     setPracticeResults(null);
     setPracticePhase('typing');
+    setPracticeStarted(false);
     setPracticeKey((k) => k + 1);
     setPlayMode('practice');
   }, [practicePunctuation]);
@@ -361,6 +424,7 @@ const Index = () => {
     setPracticeText(text);
     setPracticeResults(null);
     setPracticePhase('typing');
+    setPracticeStarted(false);
     setPracticeKey((k) => k + 1);
   }, [practicePunctuation]);
 
@@ -393,9 +457,21 @@ const Index = () => {
   // Offline state helpers
   const lastRoundResult = offline.match?.roundResults[offline.match.roundResults.length - 1] || null;
 
+  // Forfeit handler for offline (1v AI) — immediately go home
+  const handleOfflineForfeit = useCallback(() => {
+    offline.playAgain();
+    setPlayMode('offline');
+  }, [offline]);
+
+  // Forfeit handler for online (competitive) — reset match and go home
+  const handleOnlineForfeit = useCallback(() => {
+    online.resetMatch();
+    setPlayMode('offline');
+  }, [online]);
+
   const getAggregateStats = (): RoundStats => {
     if (!offline.match || offline.match.roundResults.length === 0) {
-      return { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 1, errors: 0, charactersTyped: 0, correctCharacters: 0 };
+      return { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 1, errors: 0, totalErrors: 0, charactersTyped: 0, correctCharacters: 0 };
     }
     const totals = offline.match.roundResults.reduce(
       (acc, r) => ({
@@ -404,22 +480,39 @@ const Index = () => {
         accuracy: acc.accuracy + r.playerStats.accuracy,
         consistency: acc.consistency + r.playerStats.consistency,
         errors: acc.errors + r.playerStats.errors,
+        totalErrors: acc.totalErrors + (r.playerStats.totalErrors ?? r.playerStats.errors),
         charactersTyped: acc.charactersTyped + r.playerStats.charactersTyped,
         correctCharacters: acc.correctCharacters + r.playerStats.correctCharacters,
       }),
-      { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 0, errors: 0, charactersTyped: 0, correctCharacters: 0 },
+      { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 0, errors: 0, totalErrors: 0, charactersTyped: 0, correctCharacters: 0 },
     );
     const count = offline.match.roundResults.length;
+
+    // Merge wpmHistory from all rounds with cumulative time offsets
+    let wpmHistory: import('@/utils/scoring').WpmHistoryPoint[] = [];
+    let timeOffset = 0;
+    for (const r of offline.match.roundResults) {
+      const h = r.playerStats.wpmHistory;
+      if (h && h.length > 0) {
+        for (const p of h) {
+          wpmHistory.push({ ...p, second: p.second + timeOffset });
+        }
+        timeOffset += h[h.length - 1].second;
+      }
+    }
+
     return {
       wpm: totals.wpm / count, rawWpm: totals.rawWpm / count,
       accuracy: totals.accuracy / count, consistency: totals.consistency / count,
-      errors: totals.errors, charactersTyped: totals.charactersTyped, correctCharacters: totals.correctCharacters,
+      errors: totals.errors, totalErrors: totals.totalErrors,
+      charactersTyped: totals.charactersTyped, correctCharacters: totals.correctCharacters,
+      wpmHistory: wpmHistory.length > 0 ? wpmHistory : undefined,
     };
   };
 
   const getOpponentAggregateStats = (): RoundStats => {
     if (!offline.match || offline.match.roundResults.length === 0) {
-      return { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 1, errors: 0, charactersTyped: 0, correctCharacters: 0 };
+      return { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 1, errors: 0, totalErrors: 0, charactersTyped: 0, correctCharacters: 0 };
     }
     const totals = offline.match.roundResults.reduce(
       (acc, r) => ({
@@ -428,16 +521,18 @@ const Index = () => {
         accuracy: acc.accuracy + r.opponentStats.accuracy,
         consistency: acc.consistency + r.opponentStats.consistency,
         errors: acc.errors + r.opponentStats.errors,
+        totalErrors: acc.totalErrors + (r.opponentStats.totalErrors ?? r.opponentStats.errors),
         charactersTyped: acc.charactersTyped + r.opponentStats.charactersTyped,
         correctCharacters: acc.correctCharacters + r.opponentStats.correctCharacters,
       }),
-      { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 0, errors: 0, charactersTyped: 0, correctCharacters: 0 },
+      { wpm: 0, rawWpm: 0, accuracy: 0, consistency: 0, errors: 0, totalErrors: 0, charactersTyped: 0, correctCharacters: 0 },
     );
     const count = offline.match.roundResults.length;
     return {
       wpm: totals.wpm / count, rawWpm: totals.rawWpm / count,
       accuracy: totals.accuracy / count, consistency: totals.consistency / count,
-      errors: totals.errors, charactersTyped: totals.charactersTyped, correctCharacters: totals.correctCharacters,
+      errors: totals.errors, totalErrors: totals.totalErrors,
+      charactersTyped: totals.charactersTyped, correctCharacters: totals.correctCharacters,
     };
   };
 
@@ -519,6 +614,7 @@ const Index = () => {
             onComplete={handleOnlineRoundComplete}
             onCompleteRaw={handleOnlineCompleteRaw}
             onProgressUpdate={handleOnlineProgressUpdate}
+            onForfeit={handleOnlineForfeit}
           />
         )}
 
@@ -547,54 +643,73 @@ const Index = () => {
   if (playMode === 'practice') {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        {/* Header */}
-        <div className="w-full max-w-4xl mx-auto pt-8 px-4">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setPlayMode('offline')}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        {/* Header — hidden during active typing for focus */}
+        <AnimatePresence>
+          {(!practiceStarted || practicePhase === 'results') && (
+            <motion.div
+              className="w-full max-w-4xl mx-auto pt-8 px-4"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
             >
-              ← Back
-            </button>
-            <h1 className="text-xl font-bold tracking-tight">
-              <span className="text-primary">Velo</span>
-              <span className="text-foreground">Type</span>
-            </h1>
-            <div className="w-12" /> {/* Spacer for centering */}
-          </div>
-        </div>
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setPlayMode('offline')}
+                  className="px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
+                >
+                  ✕ Exit
+                </button>
+                <h1 className="text-xl font-bold tracking-tight">
+                  <span className="text-primary">Velo</span>
+                  <span className="text-foreground">Type</span>
+                </h1>
+                <div className="w-12" /> {/* Spacer for centering */}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-16">
           <div className="w-full max-w-4xl space-y-8">
-            {/* Settings bar — only interactive before/after typing */}
-            {practicePhase === 'typing' && (
-              <TypingOptionsBar
-                punctuationEnabled={practicePunctuation}
-                timeLimit={practiceTimeLimit}
-                onTogglePunctuation={() => {
-                  setPracticePunctuation((p) => !p);
-                  // Regenerate text with new setting
-                  const seed = generateMatchSeed();
-                  const text = getSeededText(seed, {
-                    length: 200,
-                    includePunctuation: !practicePunctuation,
-                  });
-                  setPracticeText(text);
-                  setPracticeKey((k) => k + 1);
-                }}
-                onTimeLimitChange={(seconds) => {
-                  setPracticeTimeLimit(seconds as 15 | 30 | 60 | 120);
-                  // Reset the test with new time
-                  const seed = generateMatchSeed();
-                  const text = getSeededText(seed, {
-                    length: 200,
-                    includePunctuation: practicePunctuation,
-                  });
-                  setPracticeText(text);
-                  setPracticeKey((k) => k + 1);
-                }}
-              />
-            )}
+            {/* Settings bar — hidden once typing starts for focus */}
+            <AnimatePresence>
+              {practicePhase === 'typing' && !practiceStarted && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <TypingOptionsBar
+                    punctuationEnabled={practicePunctuation}
+                    timeLimit={practiceTimeLimit}
+                    onTogglePunctuation={() => {
+                      setPracticePunctuation((p) => !p);
+                      // Regenerate text with new setting
+                      const seed = generateMatchSeed();
+                      const text = getSeededText(seed, {
+                        length: 200,
+                        includePunctuation: !practicePunctuation,
+                      });
+                      setPracticeText(text);
+                      setPracticeKey((k) => k + 1);
+                    }}
+                    onTimeLimitChange={(seconds) => {
+                      setPracticeTimeLimit(seconds as 15 | 30 | 60 | 120);
+                      // Reset the test with new time
+                      const seed = generateMatchSeed();
+                      const text = getSeededText(seed, {
+                        length: 200,
+                        includePunctuation: practicePunctuation,
+                      });
+                      setPracticeText(text);
+                      setPracticeKey((k) => k + 1);
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence mode="wait">
               {practicePhase === 'typing' && (
@@ -604,6 +719,9 @@ const Index = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
+                  onKeyDown={() => {
+                    if (!practiceStarted) setPracticeStarted(true);
+                  }}
                 >
                   <TypingArena
                     key={practiceKey}
@@ -611,6 +729,7 @@ const Index = () => {
                     isActive={true}
                     timeLimit={practiceTimeLimit}
                     onComplete={handlePracticeComplete}
+                    focusMode
                   />
                 </motion.div>
               )}
@@ -618,53 +737,83 @@ const Index = () => {
               {practicePhase === 'results' && practiceResults && (
                 <motion.div
                   key="results"
-                  className="space-y-8"
+                  className="space-y-10"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
                 >
                   {/* Hero stats — WPM + Accuracy large */}
-                  <div className="flex items-end justify-center gap-12">
+                  <div className="flex items-end justify-center gap-16">
                     <div className="text-center">
-                      <div className="text-sm text-muted-foreground mb-1">wpm</div>
-                      <div className="text-6xl font-bold font-mono text-primary">
+                      <div className="text-base text-muted-foreground mb-1">wpm</div>
+                      <div className="text-7xl md:text-8xl font-bold font-mono text-primary">
                         {Math.round(practiceResults.wpm)}
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-sm text-muted-foreground mb-1">accuracy</div>
-                      <div className="text-6xl font-bold font-mono text-primary">
+                      <div className="text-base text-muted-foreground mb-1">accuracy</div>
+                      <div className="text-7xl md:text-8xl font-bold font-mono text-primary">
                         {Math.round(practiceResults.accuracy * 100)}%
                       </div>
                     </div>
                   </div>
 
+                  {/* WPM over time chart */}
+                  {practiceResults.wpmHistory && practiceResults.wpmHistory.length > 1 && (
+                    <motion.div
+                      className="rounded-xl border border-border bg-card/50 p-6"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.15 }}
+                    >
+                      <WpmChart data={practiceResults.wpmHistory} className="h-[240px]" />
+                    </motion.div>
+                  )}
+
                   {/* Secondary stats row */}
-                  <div className="flex items-center justify-center gap-8 text-center">
+                  <div className="flex items-center justify-center gap-10 text-center">
                     <div>
-                      <div className="text-xs text-muted-foreground">raw</div>
-                      <div className="text-lg font-mono font-semibold text-foreground">
+                      <div className="text-sm text-muted-foreground">test type</div>
+                      <div className="text-base font-mono font-semibold text-foreground">
+                        time {practiceTimeLimit}
+                      </div>
+                      <div className="text-sm text-muted-foreground">english</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">raw</div>
+                      <div className="text-2xl font-mono font-semibold text-foreground">
                         {Math.round(practiceResults.rawWpm)}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">characters</div>
-                      <div className="text-lg font-mono font-semibold text-foreground">
+                      <div className="text-sm text-muted-foreground">characters</div>
+                      <div className="text-2xl font-mono font-semibold text-foreground">
                         <span className="text-green-400">{practiceResults.correctCharacters}</span>
                         <span className="text-muted-foreground">/</span>
                         <span className="text-red-400">{practiceResults.errors}</span>
+                        {(practiceResults.totalErrors ?? 0) > practiceResults.errors && (
+                          <>
+                            <span className="text-muted-foreground">/</span>
+                            <span className="text-yellow-400">{(practiceResults.totalErrors ?? 0) - practiceResults.errors}</span>
+                          </>
+                        )}
                       </div>
+                      {(practiceResults.totalErrors ?? 0) > practiceResults.errors && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          <span className="text-yellow-400">{(practiceResults.totalErrors ?? 0) - practiceResults.errors}</span> corrected
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">consistency</div>
-                      <div className="text-lg font-mono font-semibold text-foreground">
+                      <div className="text-sm text-muted-foreground">consistency</div>
+                      <div className="text-2xl font-mono font-semibold text-foreground">
                         {Math.round(practiceResults.consistency * 100)}%
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">time</div>
-                      <div className="text-lg font-mono font-semibold text-foreground">
+                      <div className="text-sm text-muted-foreground">time</div>
+                      <div className="text-2xl font-mono font-semibold text-foreground">
                         {practiceTimeLimit}s
                       </div>
                     </div>
@@ -674,7 +823,7 @@ const Index = () => {
                   <div className="flex items-center justify-center gap-4">
                     <motion.button
                       onClick={restartPractice}
-                      className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-lg"
+                      className="px-10 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-xl"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -685,8 +834,8 @@ const Index = () => {
               )}
             </AnimatePresence>
 
-            {/* Restart hint */}
-            {practicePhase === 'typing' && (
+            {/* Restart hint — hidden during active typing for focus */}
+            {practicePhase === 'typing' && !practiceStarted && (
               <motion.div
                 className="text-center"
                 initial={{ opacity: 0 }}
@@ -776,52 +925,54 @@ const Index = () => {
                 onClick={startOnlineQueue}
                 className={cn(
                   'w-full py-4 px-8 rounded-xl font-bold text-lg',
-                  'bg-primary text-primary-foreground',
-                  'glow-primary hover:glow-primary-intense',
+                  'bg-secondary text-foreground',
+                  'hover:bg-primary hover:text-primary-foreground hover:glow-primary-intense',
                   'transition-all duration-300',
-                  'border-2 border-primary/50',
+                  'border border-border',
                 )}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
-                ⚔️ PLAY RANKED
+                Competitive
               </motion.button>
 
               <motion.button
                 onClick={startOfflineQueue}
                 className={cn(
-                  'w-full py-3 px-8 rounded-xl font-semibold',
-                  'bg-secondary text-secondary-foreground',
-                  'hover:bg-secondary/80 transition-all duration-200',
+                  'w-full py-4 px-8 rounded-xl font-bold text-lg',
+                  'bg-secondary text-foreground',
+                  'hover:bg-primary hover:text-primary-foreground hover:glow-primary-intense',
+                  'transition-all duration-300',
                   'border border-border',
                 )}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
-                🎯 PRACTICE (vs Bot)
+                Robo
               </motion.button>
 
               <motion.button
                 onClick={startPractice}
                 className={cn(
-                  'w-full py-3 px-8 rounded-xl font-semibold',
-                  'bg-muted text-muted-foreground',
-                  'hover:bg-muted/80 hover:text-foreground transition-all duration-200',
-                  'border border-border/50',
+                  'w-full py-4 px-8 rounded-xl font-bold text-lg',
+                  'bg-secondary text-foreground',
+                  'hover:bg-primary hover:text-primary-foreground hover:glow-primary-intense',
+                  'transition-all duration-300',
+                  'border border-border',
                 )}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
-                ⌨️ FREE TYPE
+                FreeType
               </motion.button>
             </div>
           </motion.div>
@@ -837,6 +988,8 @@ const Index = () => {
           playerDamage={lastRoundResult?.damageTaken}
           opponentDamage={lastRoundResult?.damageDealt}
           punctuationEnabled={offline.match.textSettings.punctuation}
+          isTypingActive={offline.phase === 'playing'}
+          onForfeit={handleOfflineForfeit}
         />
       )}
 

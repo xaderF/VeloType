@@ -3,6 +3,7 @@
 // Props: isVisible, roundResult, onContinue, drawAvailable.
 import { motion, AnimatePresence } from 'framer-motion';
 import { RoundResultCard } from '@/components/game-ui/ResultCards';
+import { WpmChart } from '@/components/game-ui/WpmChart';
 import { RoundResult } from '@/types/game';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +30,8 @@ export function RoundEndOverlay({
 }: RoundEndOverlayProps) {
   if (!roundResult) return null;
 
+  console.log('[RoundEndOverlay] wpmHistory:', roundResult.playerStats.wpmHistory?.length ?? 'undefined');
+
   return (
     <AnimatePresence>
       {isVisible && (
@@ -48,10 +51,24 @@ export function RoundEndOverlay({
               roundNumber={roundResult.roundNumber}
               playerStats={roundResult.playerStats}
               opponentStats={roundResult.opponentStats}
+              playerScore={roundResult.playerScore}
+              opponentScore={roundResult.opponentScore}
               damageDealt={roundResult.damageDealt}
               damageTaken={roundResult.damageTaken}
               winner={roundResult.winner}
             />
+
+            {/* WPM Chart for this round */}
+            {roundResult.playerStats.wpmHistory && roundResult.playerStats.wpmHistory.length > 1 && (
+              <motion.div
+                className="mt-4 rounded-xl border border-border bg-card/50 p-4"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <WpmChart data={roundResult.playerStats.wpmHistory} className="h-[160px]" />
+              </motion.div>
+            )}
 
             <motion.div
               className="text-center mt-6 text-muted-foreground space-y-3"

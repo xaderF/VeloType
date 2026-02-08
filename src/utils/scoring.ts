@@ -1,14 +1,24 @@
 // scoring.ts
 // utility functions for scoring, including rating calculations and rank determination.
 
+export interface WpmHistoryPoint {
+  second: number;
+  wpm: number;
+  raw: number;
+  errors: number;
+}
+
 export interface RoundStats {
   wpm: number;
   rawWpm: number;
   accuracy: number; // 0-1 ratio
   consistency: number; // 0-1 score based on WPM variance
   errors: number;
+  /** Cumulative errors including corrected ones */
+  totalErrors: number;
   charactersTyped: number;
   correctCharacters: number;
+  wpmHistory?: WpmHistoryPoint[];
 }
 
 export interface MatchResult {

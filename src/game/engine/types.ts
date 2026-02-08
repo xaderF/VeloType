@@ -25,6 +25,10 @@ export interface TypingState {
   mode: TypingMode;
   limit: number;
   errors: number;
+  /** Cumulative errors — includes mistakes that were later corrected via backspace */
+  totalErrors: number;
+  /** Total keystrokes typed (not counting backspace) — never decrements */
+  totalKeystrokes: number;
   samples: number[];
   lastSampleMs: number | null;
 }
