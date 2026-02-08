@@ -7,7 +7,7 @@ import { useGameState } from '@/hooks/useGameState';
 import { useAuth } from '@/hooks/useAuth';
 import { useOnlineMatch } from '@/hooks/useOnlineMatch';
 import { HomeScreen } from '@/components/screens/HomeScreen';
-import { PlayModeSelect, type GameMode } from '@/components/screens/PlayModeSelect';
+import { PlayModeSelect } from '@/components/screens/PlayModeSelect';
 import { SettingsPanel } from '@/components/screens/SettingsPanel';
 import { PlayScreen } from '@/components/screens/PlayScreen';
 import { ResultsScreen } from '@/components/screens/ResultsScreen';
@@ -401,12 +401,15 @@ const Index = () => {
       setShowAuth(true);
       return;
     }
-    setShowModeSelect(false);
-    setPlayMode('online');
     online.joinQueue();
   }, [auth.isAuthenticated, online]);
 
-  // Start offline practice
+  const cancelCompetitiveQueue = useCallback(() => {
+    online.cancelQueue();
+    setPlayMode('offline');
+  }, [online]);
+
+  // Start versus-bot queue
   const startOfflineQueue = useCallback(() => {
     setShowModeSelect(false);
     setPlayMode('offline');
@@ -434,14 +437,13 @@ const Index = () => {
     setShowModeSelect(true);
   }, []);
 
-  // Handle mode selection from PlayModeSelect
-  const handleModeSelect = useCallback((mode: GameMode) => {
-    switch (mode) {
-      case 'competitive': startOnlineQueue(); break;
-      case 'bot': startOfflineQueue(); break;
-      case 'freetype': startPractice(); break;
+  const closeModeSelect = useCallback(() => {
+    if (online.phase === 'queuing') {
+      online.cancelQueue();
+      setPlayMode('offline');
     }
-  }, [startOnlineQueue, startOfflineQueue, startPractice]);
+    setShowModeSelect(false);
+  }, [online]);
 
   // Restart practice with new text
   const restartPractice = useCallback(() => {
@@ -483,6 +485,36 @@ const Index = () => {
     }
   }, [auth.isAuthenticated, showAuth]);
 
+  // Keep the mode-select screen stable while queueing to avoid mount/unmount flicker.
+  // Move to online flow only when an actual match lifecycle starts.
+  useEffect(() => {
+    if (
+      online.phase === 'match_found' ||
+      online.phase === 'countdown' ||
+      online.phase === 'playing' ||
+      online.phase === 'waiting_opponent' ||
+      online.phase === 'complete' ||
+      online.phase === 'reconnecting'
+    ) {
+      setPlayMode('online');
+    }
+  }, [online.phase]);
+
+  // Auto-hide mode select once a competitive match is found/started.
+  useEffect(() => {
+    if (!showModeSelect) return;
+    if (
+      online.phase === 'match_found' ||
+      online.phase === 'countdown' ||
+      online.phase === 'playing' ||
+      online.phase === 'waiting_opponent' ||
+      online.phase === 'complete' ||
+      online.phase === 'reconnecting'
+    ) {
+      setShowModeSelect(false);
+    }
+  }, [online.phase, showModeSelect]);
+
   // Offline state helpers
   const lastRoundResult = offline.match?.roundResults[offline.match.roundResults.length - 1] || null;
 
@@ -518,7 +550,7 @@ const Index = () => {
     const count = offline.match.roundResults.length;
 
     // Merge wpmHistory from all rounds with cumulative time offsets
-    let wpmHistory: import('@/utils/scoring').WpmHistoryPoint[] = [];
+    const wpmHistory: import('@/utils/scoring').WpmHistoryPoint[] = [];
     let timeOffset = 0;
     for (const r of offline.match.roundResults) {
       const h = r.playerStats.wpmHistory;
@@ -598,11 +630,6 @@ const Index = () => {
               onSettings={() => setShowSettings(true)}
               onLogin={() => setShowAuth(true)}
               onLogout={auth.logout}
-            />
-            <QueueOverlay
-              isVisible
-              onCancel={() => { online.cancelQueue(); setPlayMode('offline'); }}
-              elapsedTime={online.queueTime}
             />
           </>
         )}
@@ -756,8 +783,15 @@ const Index = () => {
         <PlayModeSelect
           isVisible={showModeSelect}
           isAuthenticated={auth.isAuthenticated}
-          onSelectMode={handleModeSelect}
-          onBack={() => setShowModeSelect(false)}
+          username={auth.user?.username}
+          rating={auth.user?.rating ?? null}
+          isCompetitiveQueueing={online.phase === 'queuing'}
+          competitiveQueueTime={online.queueTime}
+          onStartCompetitiveQueue={startOnlineQueue}
+          onCancelCompetitiveQueue={cancelCompetitiveQueue}
+          onStartBot={startOfflineQueue}
+          onStartFreeType={startPractice}
+          onBack={closeModeSelect}
           onLogin={() => setShowAuth(true)}
         />
 
@@ -993,8 +1027,15 @@ const Index = () => {
         <PlayModeSelect
           isVisible={showModeSelect}
           isAuthenticated={auth.isAuthenticated}
-          onSelectMode={handleModeSelect}
-          onBack={() => setShowModeSelect(false)}
+          username={auth.user?.username}
+          rating={auth.user?.rating ?? null}
+          isCompetitiveQueueing={online.phase === 'queuing'}
+          competitiveQueueTime={online.queueTime}
+          onStartCompetitiveQueue={startOnlineQueue}
+          onCancelCompetitiveQueue={cancelCompetitiveQueue}
+          onStartBot={startOfflineQueue}
+          onStartFreeType={startPractice}
+          onBack={closeModeSelect}
           onLogin={() => setShowAuth(true)}
         />
 
@@ -1071,8 +1112,15 @@ const Index = () => {
       <PlayModeSelect
         isVisible={showModeSelect}
         isAuthenticated={auth.isAuthenticated}
-        onSelectMode={handleModeSelect}
-        onBack={() => setShowModeSelect(false)}
+        username={auth.user?.username}
+        rating={auth.user?.rating ?? null}
+        isCompetitiveQueueing={online.phase === 'queuing'}
+        competitiveQueueTime={online.queueTime}
+        onStartCompetitiveQueue={startOnlineQueue}
+        onCancelCompetitiveQueue={cancelCompetitiveQueue}
+        onStartBot={startOfflineQueue}
+        onStartFreeType={startPractice}
+        onBack={closeModeSelect}
         onLogin={() => setShowAuth(true)}
       />
 

@@ -1,85 +1,113 @@
-// PlayModeSelect — full-screen mode selection sub-screen (Valorant-style)
-// Shows when the player clicks PLAY from the lobby.
-// Three mode cards: Competitive, Versus Bot, Free Type.
-
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { UserCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LetterParticles } from '@/components/game-ui/LetterParticles';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type GameMode = 'competitive' | 'bot' | 'freetype';
 
-interface ModeCard {
+interface ModeTab {
   id: GameMode;
   title: string;
   subtitle: string;
   description: string;
-  icon: string;        
-  accent: string;
-  authRequired?: boolean;
 }
 
-const MODES: ModeCard[] = [
+const MODES: ModeTab[] = [
   {
     id: 'competitive',
     title: 'COMPETITIVE',
-    subtitle: 'Ranked Match',
-    description: 'Queue into a live 1v1 against a real opponent. ELO rating on the line.',
-    icon: '⚔️',
-    accent: 'from-red-500/20 to-orange-500/10',
-    authRequired: true,
+    subtitle: 'Ranked 1v1',
+    description: 'Live matchmaking with rating impact. Server-authoritative scoring and damage resolution.',
   },
   {
     id: 'bot',
     title: 'VERSUS BOT',
     subtitle: 'Quick Match',
-    description: 'Battle an AI opponent. Practice your combat typing without rating risk.',
-    icon: '🤖',
-    accent: 'from-blue-500/20 to-cyan-500/10',
+    description: 'Fight an AI opponent and practice pressure rounds without affecting your ranked profile.',
   },
   {
     id: 'freetype',
     title: 'FREE TYPE',
-    subtitle: 'Solo Practice',
-    description: 'Pure typing practice. No opponents, no pressure — just you and the words.',
-    icon: '⌨️',
-    accent: 'from-emerald-500/20 to-teal-500/10',
+    subtitle: 'Solo Run',
+    description: 'Pure typing session for speed and consistency. No opponent, no rank risk.',
   },
 ];
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
 
 export interface PlayModeSelectProps {
   isVisible: boolean;
   isAuthenticated: boolean;
-  onSelectMode: (mode: GameMode) => void;
+  username?: string;
+  rating?: number | null;
+  isCompetitiveQueueing: boolean;
+  competitiveQueueTime: number;
+  onStartCompetitiveQueue: () => void;
+  onCancelCompetitiveQueue: () => void;
+  onStartBot: () => void;
+  onStartFreeType: () => void;
   onBack: () => void;
   onLogin: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function formatTime(totalSeconds: number) {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 export function PlayModeSelect({
   isVisible,
   isAuthenticated,
-  onSelectMode,
+  username,
+  rating,
+  isCompetitiveQueueing,
+  competitiveQueueTime,
+  onStartCompetitiveQueue,
+  onCancelCompetitiveQueue,
+  onStartBot,
+  onStartFreeType,
   onBack,
   onLogin,
 }: PlayModeSelectProps) {
-  const handleSelect = (mode: ModeCard) => {
-    if (mode.authRequired && !isAuthenticated) {
-      onLogin();
+  const [activeMode, setActiveMode] = useState<GameMode>('competitive');
+
+  useEffect(() => {
+    if (isCompetitiveQueueing) setActiveMode('competitive');
+  }, [isCompetitiveQueueing]);
+
+  const active = useMemo(() => MODES.find((m) => m.id === activeMode) ?? MODES[0], [activeMode]);
+  const isCompetitiveMode = activeMode === 'competitive';
+  const isCompetitiveInQueue = isCompetitiveMode && isCompetitiveQueueing;
+
+  const handlePrimaryAction = () => {
+    if (isCompetitiveMode) {
+      if (!isAuthenticated) {
+        onLogin();
+        return;
+      }
+      if (isCompetitiveQueueing) {
+        onCancelCompetitiveQueue();
+        return;
+      }
+      onStartCompetitiveQueue();
       return;
     }
-    onSelectMode(mode.id);
+
+    if (activeMode === 'bot') {
+      onStartBot();
+      return;
+    }
+
+    onStartFreeType();
   };
+
+  const primaryLabel = activeMode === 'competitive'
+    ? isCompetitiveQueueing
+      ? 'IN QUEUE'
+      : 'START'
+    : activeMode === 'bot'
+      ? 'START VERSUS BOT'
+      : 'START FREE TYPE';
 
   return (
     <AnimatePresence>
@@ -89,110 +117,133 @@ export function PlayModeSelect({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          transition={{ duration: 0.2 }}
         >
-          {/* Shared background */}
           <LetterParticles />
 
-          {/* Top bar with back button */}
-          <motion.div
-            className="relative z-10 flex items-center px-10 pt-8 pb-4"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+          <div className="relative z-10 flex items-center justify-between px-8 md:px-12 pt-7 pb-5 border-b border-lobby-text-muted/15">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 text-sm font-semibold tracking-widest uppercase text-lobby-text-muted hover:text-lobby-text transition-colors"
+              className="flex items-center gap-2 text-xs md:text-sm font-semibold tracking-[0.2em] uppercase text-lobby-text-muted hover:text-lobby-text transition-colors"
             >
-              <span className="text-lg">←</span>
-              BACK
+              <span className="text-base">←</span>
+              Back
             </button>
-          </motion.div>
-
-          {/* Title */}
-          <motion.div
-            className="relative z-10 text-center mb-8"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <h1 className="text-3xl md:text-4xl font-bold tracking-[0.25em] uppercase text-lobby-text">
-              SELECT <span className="text-accent">MODE</span>
+            <h1 className="text-xl md:text-3xl font-bold tracking-[0.25em] uppercase text-lobby-text">
+              Play
             </h1>
-            <p className="text-xs tracking-[0.3em] uppercase text-lobby-text-muted mt-2">
-              Choose your game type
-            </p>
-          </motion.div>
+            <div className="w-16 md:w-24" />
+          </div>
 
-          {/* Mode cards */}
-          <div className="relative z-10 flex-1 flex items-center justify-center px-10 pb-16">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full">
-              {MODES.map((mode, i) => {
-                const locked = mode.authRequired && !isAuthenticated;
-
-                return (
-                  <motion.button
-                    key={mode.id}
-                    onClick={() => handleSelect(mode)}
-                    className={cn(
-                      'group relative flex flex-col items-center text-center p-8 rounded-2xl border transition-all duration-300',
-                      'bg-gradient-to-b',
-                      mode.accent,
-                      locked
-                        ? 'border-lobby-text-muted/10 opacity-60'
-                        : 'border-lobby-text-muted/20 hover:border-accent/40 hover:shadow-[0_0_40px_hsl(var(--accent)/0.1)]',
-                    )}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + i * 0.1, type: 'spring', bounce: 0.3 }}
-                    whileHover={locked ? {} : { scale: 1.03, y: -4 }}
-                    whileTap={locked ? {} : { scale: 0.98 }}
-                  >
-                    {/* Icon */}
-                    <span className="text-4xl mb-4">{mode.icon}</span>
-
-                    {/* Title */}
-                    <h2 className="text-lg font-bold tracking-[0.2em] uppercase text-lobby-text mb-1">
-                      {mode.title}
-                    </h2>
-
-                    {/* Subtitle */}
-                    <p className="text-xs tracking-widest uppercase text-accent mb-4">
-                      {mode.subtitle}
-                    </p>
-
-                    {/* Description */}
-                    <p className="text-sm text-lobby-text-muted leading-relaxed max-w-[220px]">
-                      {mode.description}
-                    </p>
-
-                    {/* Lock overlay */}
-                    {locked && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-end pb-6 rounded-2xl bg-lobby-bg/40 backdrop-blur-[1px]">
-                        <svg
-                          className="w-5 h-5 text-lobby-text-muted mb-1"
-                          viewBox="0 0 16 16"
-                          fill="currentColor"
-                        >
-                          <path d="M11 7V5a3 3 0 0 0-6 0v2H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-1Zm-4-2a1 1 0 1 1 2 0v2H7V5Z" />
-                        </svg>
-                        <span className="text-xs text-lobby-text-muted tracking-widest uppercase">
-                          Sign in to play
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Bottom accent line on hover */}
-                    <span
+          <div className="relative z-10 px-5 md:px-10 pt-4">
+            <div className="mx-auto max-w-6xl overflow-x-auto">
+              <div className="inline-flex min-w-full md:min-w-0 md:flex w-full justify-start md:justify-center gap-1 md:gap-2">
+                {MODES.map((mode) => {
+                  const isActive = activeMode === mode.id;
+                  const disabled = isCompetitiveQueueing && mode.id !== 'competitive';
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => setActiveMode(mode.id)}
+                      disabled={disabled}
                       className={cn(
-                        'absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full bg-accent transition-all duration-300',
-                        locked ? 'w-0' : 'w-0 group-hover:w-2/3',
+                        'px-4 md:px-6 py-3 rounded-t-md border-b-2 text-[10px] md:text-xs font-semibold tracking-[0.18em] uppercase whitespace-nowrap transition-all',
+                        isActive
+                          ? 'text-accent border-accent bg-accent/10'
+                          : 'text-lobby-text-muted border-transparent hover:text-lobby-text hover:border-lobby-text-muted/40',
+                        disabled && 'opacity-40 cursor-not-allowed',
                       )}
-                    />
-                  </motion.button>
-                );
-              })}
+                    >
+                      {mode.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 flex-1 flex items-center justify-center px-4 md:px-10 pb-10">
+            <div className="w-full max-w-6xl grid md:grid-cols-[1fr_auto_1fr] gap-6 items-center">
+              <div className="hidden md:block h-[320px] rounded-xl border border-lobby-text-muted/15 bg-lobby-text-muted/[0.03]" />
+
+              <motion.div
+                key={activeMode}
+                className="w-full md:w-[360px] flex flex-col items-center"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+              >
+                <div className="w-full max-w-[320px] rounded-2xl border border-lobby-text-muted/25 bg-lobby-bg/75 backdrop-blur-sm p-3 shadow-[0_20px_70px_hsl(var(--background)/0.5)]">
+                  <div className="h-[420px] rounded-xl border border-lobby-text-muted/20 bg-gradient-to-b from-lobby-text-muted/[0.10] to-lobby-text-muted/[0.03] relative overflow-hidden">
+                    <div className="absolute inset-3 rounded-lg border border-lobby-text-muted/15 bg-lobby-bg/35 flex flex-col items-center justify-center">
+                      <div className="w-24 h-24 rounded-2xl bg-lobby-bg/70 border border-lobby-text-muted/30 flex items-center justify-center">
+                        <UserCircle2 className="w-14 h-14 text-lobby-text-muted" />
+                      </div>
+                      <div className="mt-4 text-[10px] uppercase tracking-[0.2em] text-lobby-text-muted/70">
+                        Banner Placeholder
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center mt-5 max-w-[420px]">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-accent">{active.subtitle}</div>
+                  <h2 className="mt-1 text-2xl md:text-3xl font-bold tracking-[0.08em] uppercase text-lobby-text">
+                    {active.title}
+                  </h2>
+                  <div className="mt-1 text-xs text-lobby-text-muted">
+                    {username ?? 'Player'} {rating != null ? `• MMR ${rating}` : '• Unranked'}
+                  </div>
+                  <p className="mt-2 text-sm text-lobby-text-muted leading-relaxed min-h-[56px]">
+                    {active.description}
+                  </p>
+                </div>
+
+                <div className="mt-4 w-full max-w-[420px] space-y-2">
+                  <button
+                    onClick={handlePrimaryAction}
+                    className={cn(
+                      'w-full h-12 rounded-lg font-bold tracking-[0.18em] uppercase text-sm transition-all px-4',
+                      'inline-flex items-center justify-center relative',
+                      isCompetitiveMode
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_22px_hsl(var(--primary)/0.32)]'
+                        : 'bg-lobby-text text-lobby-bg hover:brightness-110',
+                      isCompetitiveInQueue && 'ring-2 ring-primary/50',
+                      'active:scale-[0.99]',
+                    )}
+                    aria-label={isCompetitiveInQueue ? 'Exit queue' : undefined}
+                    title={isCompetitiveInQueue ? 'Click anywhere on this button to stop queue' : undefined}
+                  >
+                    {isCompetitiveMode ? (
+                      <span className="w-full text-center">
+                        {primaryLabel}
+                        <X
+                          className={cn(
+                            'w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 transition-opacity pointer-events-none',
+                            isCompetitiveInQueue ? 'opacity-100' : 'opacity-0',
+                          )}
+                        />
+                      </span>
+                    ) : (
+                      <span>{primaryLabel}</span>
+                    )}
+                  </button>
+
+                  {isCompetitiveInQueue && (
+                    <div className="text-center text-xs font-mono text-lobby-text-muted tracking-[0.08em]">
+                      {formatTime(competitiveQueueTime)}
+                    </div>
+                  )}
+
+                  {activeMode === 'competitive' && !isAuthenticated && (
+                    <p className="text-center text-xs text-lobby-text-muted">
+                      Sign in required for competitive queue.
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+
+              <div className="hidden md:block h-[320px] rounded-xl border border-lobby-text-muted/15 bg-lobby-text-muted/[0.03]" />
             </div>
           </div>
         </motion.div>

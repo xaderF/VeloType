@@ -108,6 +108,7 @@ export async function authRoutes(app: FastifyInstance) {
         createdAt: created.createdAt,
         rating: created.rating?.rating ?? null,
         competitiveElo: created.rating?.competitiveElo ?? null,
+        placementGamesPlayed: created.rating?.placementGamesPlayed ?? 0,
         settings: created.settings,
       },
     };
@@ -149,6 +150,7 @@ export async function authRoutes(app: FastifyInstance) {
         createdAt: user.createdAt,
         rating: user.rating?.rating ?? null,
         competitiveElo: user.rating?.competitiveElo ?? null,
+        placementGamesPlayed: user.rating?.placementGamesPlayed ?? 0,
         settings: user.settings,
       },
     };
@@ -182,12 +184,13 @@ export async function authRoutes(app: FastifyInstance) {
           id: existingOauthUser.id,
           username: existingOauthUser.username,
           email: existingOauthUser.email,
-          createdAt: existingOauthUser.createdAt,
-          rating: existingOauthUser.rating?.rating ?? null,
-          competitiveElo: existingOauthUser.rating?.competitiveElo ?? null,
-          settings: existingOauthUser.settings,
-        },
-      };
+            createdAt: existingOauthUser.createdAt,
+            rating: existingOauthUser.rating?.rating ?? null,
+            competitiveElo: existingOauthUser.rating?.competitiveElo ?? null,
+            placementGamesPlayed: existingOauthUser.rating?.placementGamesPlayed ?? 0,
+            settings: existingOauthUser.settings,
+          },
+        };
     }
 
     if (email) {
@@ -217,6 +220,7 @@ export async function authRoutes(app: FastifyInstance) {
             createdAt: updated.createdAt,
             rating: updated.rating?.rating ?? null,
             competitiveElo: updated.rating?.competitiveElo ?? null,
+            placementGamesPlayed: updated.rating?.placementGamesPlayed ?? 0,
             settings: updated.settings,
           },
         };
@@ -245,6 +249,7 @@ export async function authRoutes(app: FastifyInstance) {
         createdAt: created.createdAt,
         rating: created.rating?.rating ?? null,
         competitiveElo: created.rating?.competitiveElo ?? null,
+        placementGamesPlayed: created.rating?.placementGamesPlayed ?? 0,
         settings: created.settings,
       },
     };
