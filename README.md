@@ -131,13 +131,13 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] Daily seeded leaderboards
 - [ ] Anti-abuse and validation checks
 
-### Phase 4 — Real-Time Multiplayer (In Progress)
+### Phase 4 — Real-Time Multiplayer
 - [x] WebSocket-based match infrastructure
 - [x] Server-authoritative 1v1 match flow
-- [ ] Reconnect handling and match recovery
-- [ ] Latency and performance optimization
+- [x] Reconnect handling and match recovery
+- [x] Latency and performance optimization
 
-### Phase 5 — Expanded Game Modes
+### Phase 5 — Expanded Game Modes (In Progress)
 - [ ] Battle Royale typing mode
 - [ ] Multi-round elimination mechanics
 - [ ] Player targeting and interaction systems
