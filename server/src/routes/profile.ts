@@ -13,6 +13,7 @@ function sendDatabaseUnavailable(reply: FastifyReply) {
 export async function profileRoutes(app: FastifyInstance) {
   if (!prisma) {
     app.get('/profile', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
+    app.get('/profile/stats', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
     app.patch('/profile', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
     return;
   }
@@ -54,7 +55,67 @@ export async function profileRoutes(app: FastifyInstance) {
       updatedAt: profile.updatedAt,
       rating: profile.rating?.rating ?? null,
       competitiveElo: profile.rating?.competitiveElo ?? null,
+      placementGamesPlayed: profile.rating?.placementGamesPlayed ?? 0,
       settings: profile.settings,
+    };
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /profile/stats — aggregate match stats for the authenticated user
+  // -------------------------------------------------------------------------
+  app.get('/profile/stats', async (request: FastifyRequest, reply: FastifyReply) => {
+    const token = getBearerToken(request.headers.authorization);
+    const authUser = token ? verifyAuthToken(token) : null;
+    if (!authUser) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+
+    const matchPlayers = await db.matchPlayer.findMany({
+      where: { userId: authUser.id, result: { not: null } },
+      select: {
+        wpm: true,
+        accuracy: true,
+        consistency: true,
+        result: true,
+        ratingDelta: true,
+        match: { select: { createdAt: true } },
+      },
+      orderBy: { match: { createdAt: 'desc' } },
+    });
+
+    const total = matchPlayers.length;
+    const wins = matchPlayers.filter((m) => m.result === 'win').length;
+    const losses = matchPlayers.filter((m) => m.result === 'loss').length;
+    const draws = matchPlayers.filter((m) => m.result === 'draw').length;
+
+    const wpms = matchPlayers.filter((m) => m.wpm != null).map((m) => m.wpm!);
+    const accs = matchPlayers.filter((m) => m.accuracy != null).map((m) => m.accuracy!);
+    const conss = matchPlayers.filter((m) => m.consistency != null).map((m) => m.consistency!);
+
+    const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+    const best = (arr: number[]) => (arr.length ? Math.max(...arr) : 0);
+
+    // Recent 20 matches for sparkline / rating graph
+    const recentRatings = matchPlayers
+      .slice(0, 20)
+      .filter((m) => m.ratingDelta != null)
+      .map((m) => ({
+        delta: m.ratingDelta!,
+        date: m.match.createdAt,
+      }))
+      .reverse(); // oldest first for graph
+
+    return {
+      totalMatches: total,
+      wins,
+      losses,
+      draws,
+      winRate: total > 0 ? Math.round((wins / total) * 1000) / 10 : 0,
+      avgWpm: Math.round(avg(wpms) * 100) / 100,
+      bestWpm: Math.round(best(wpms) * 100) / 100,
+      avgAccuracy: Math.round(avg(accs) * 10000) / 10000,
+      avgConsistency: Math.round(avg(conss) * 10000) / 10000,
+      recentRatings,
     };
   });
 

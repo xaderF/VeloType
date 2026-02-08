@@ -12,6 +12,7 @@ export interface AuthUser {
   email: string | null;
   rating: number | null;           // hidden MMR (null = unranked)
   competitiveElo: number | null;   // null until Apex; starts at 0 on promotion
+  placementGamesPlayed: number;    // 0–5, how many placement games completed
   createdAt: string;
 }
 
@@ -62,6 +63,7 @@ export function useAuth() {
             email: data.email,
             rating: data.rating,
             competitiveElo: data.competitiveElo ?? null,
+            placementGamesPlayed: data.placementGamesPlayed ?? 0,
             createdAt: data.createdAt,
           };
           setAuth((prev) => ({ ...prev, user }));
@@ -96,6 +98,7 @@ export function useAuth() {
         email: data.user.email,
         rating: data.user.rating,
         competitiveElo: data.user.competitiveElo ?? null,
+        placementGamesPlayed: data.user.placementGamesPlayed ?? 0,
         createdAt: data.user.createdAt,
       };
       persistAuth(data.token, user);
@@ -129,6 +132,7 @@ export function useAuth() {
         email: data.user.email,
         rating: data.user.rating,
         competitiveElo: data.user.competitiveElo ?? null,
+        placementGamesPlayed: data.user.placementGamesPlayed ?? 0,
         createdAt: data.user.createdAt,
       };
       persistAuth(data.token, user);

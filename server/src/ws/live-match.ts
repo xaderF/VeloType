@@ -270,6 +270,10 @@ async function finaliseMatch(matchId: string) {
 
   // Persist to DB when configured.
   if (prisma) {
+    // Collect progress samples for storage (per-second WPM data for graphs)
+    const p1Samples = matchProgressSamples.get(matchId)?.get(p1) ?? subs.get(p1)?.samples ?? [];
+    const p2Samples = matchProgressSamples.get(matchId)?.get(p2) ?? subs.get(p2)?.samples ?? [];
+
     try {
       // 1. Persist match player stats + match status
       await prisma.$transaction([
@@ -283,6 +287,11 @@ async function finaliseMatch(matchId: string) {
             result: p1Result,
             damageDealt: p1Damage,
             damageTaken: p2Damage,
+            rawWpm: r1.rawWpm,
+            errors: r1.errors,
+            correctChars: r1.correctChars,
+            totalTyped: r1.totalTyped,
+            progressSamples: p1Samples,
           },
         }),
         prisma.matchPlayer.updateMany({
@@ -295,6 +304,11 @@ async function finaliseMatch(matchId: string) {
             result: p2Result,
             damageDealt: p2Damage,
             damageTaken: p1Damage,
+            rawWpm: r2.rawWpm,
+            errors: r2.errors,
+            correctChars: r2.correctChars,
+            totalTyped: r2.totalTyped,
+            progressSamples: p2Samples,
           },
         }),
         prisma.match.update({
@@ -390,6 +404,23 @@ async function finaliseMatch(matchId: string) {
             data: {
               rating: p2NewRating,
               competitiveElo: p2NewCompElo,
+            },
+          }),
+          // Persist rating snapshots on match players
+          prisma.matchPlayer.updateMany({
+            where: { matchId, userId: p1 },
+            data: {
+              ratingBefore: rating1.rating,
+              ratingAfter: p1NewRating,
+              ratingDelta: p1RatingDelta,
+            },
+          }),
+          prisma.matchPlayer.updateMany({
+            where: { matchId, userId: p2 },
+            data: {
+              ratingBefore: rating2.rating,
+              ratingAfter: p2NewRating,
+              ratingDelta: p2RatingDelta,
             },
           }),
         ]);

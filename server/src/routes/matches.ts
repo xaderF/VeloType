@@ -86,6 +86,11 @@ export async function matchRoutes(app: FastifyInstance) {
             result: row.result,
             damageDealt: row.damageDealt,
             damageTaken: row.damageTaken,
+            rawWpm: row.rawWpm,
+            errors: row.errors,
+            ratingBefore: row.ratingBefore,
+            ratingAfter: row.ratingAfter,
+            ratingDelta: row.ratingDelta,
           },
           opponent: opponent
             ? {
@@ -160,6 +165,14 @@ export async function matchRoutes(app: FastifyInstance) {
         result: player.result,
         damageDealt: player.damageDealt,
         damageTaken: player.damageTaken,
+        rawWpm: player.rawWpm,
+        errors: player.errors,
+        correctChars: player.correctChars,
+        totalTyped: player.totalTyped,
+        ratingBefore: player.ratingBefore,
+        ratingAfter: player.ratingAfter,
+        ratingDelta: player.ratingDelta,
+        progressSamples: player.progressSamples,
       })),
     };
   });
