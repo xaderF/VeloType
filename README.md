@@ -119,10 +119,10 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 
 ### Phase 2 — Persistence & Accounts
 - [x] Backend API setup
-- [ ] Database integration (users, profiles, matches)
-- [ ] Authentication (OAuth or email-based)
-- [ ] User profiles with persisted settings
-- [ ] Match history storage and retrieval
+- [x] Database integration (users, profiles, matches)
+- [x] Authentication (OAuth or email-based)
+- [x] User profiles with persisted settings
+- [x] Match history storage and retrieval
 
 ### Phase 3 — Competitive Systems
 - [ ] Ranked matchmaking queue
