@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { RankBadge } from '@/components/game-ui/RankBadge';
 import { cn } from '@/lib/utils';
 
@@ -84,6 +85,23 @@ export function HomeScreen({ username, rating, onPlayRanked }: HomeScreenProps) 
         >
           Best of 3 rounds • 30 seconds each • Winner takes ELO
         </motion.p>
+
+        {/* Nav links */}
+        {!isGuest && (
+          <motion.div
+            className="flex items-center justify-center gap-6 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Link to="/profile" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
+              Profile & Stats
+            </Link>
+            <Link to="/history" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
+              Match History
+            </Link>
+          </motion.div>
+        )}
       </motion.div>
     </div>
   );

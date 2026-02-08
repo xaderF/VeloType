@@ -57,6 +57,14 @@ model MatchPlayer {
   result         String?
   damageDealt    Float?
   damageTaken    Float?
+  rawWpm         Float?
+  errors         Int?
+  correctChars   Int?
+  totalTyped     Int?
+  ratingBefore   Int?     // hidden MMR snapshot before match
+  ratingAfter    Int?     // hidden MMR snapshot after match
+  ratingDelta    Int?     // ELO change this match
+  progressSamples Json?   // per-second WPM samples for graph/replay (number[])
   createdAt      DateTime @default(now())
 
   @@index([matchId])
