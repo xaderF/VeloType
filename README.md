@@ -110,7 +110,7 @@ root
 The following roadmap outlines planned milestones for VeloType.  
 Features are implemented incrementally, with an emphasis on correctness, fairness, and scalability.
 
-### Phase 1 — Core Foundation (In Progress)
+### Phase 1 — Core Foundation
 - [x] Deterministic typing engine
 - [x] Strongly typed game logic using TypeScript
 - [x] Modular frontend architecture
@@ -124,10 +124,10 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] User profiles with persisted settings
 - [x] Match history storage and retrieval
 
-### Phase 3 — Competitive Systems
-- [ ] Ranked matchmaking queue
-- [ ] Server-side ELO rating system
-- [ ] Rank tiers and progression visualization
+### Phase 3 — Competitive Systems (In Progress)
+- [x] Ranked matchmaking queue
+- [x] Server-side ELO rating system
+- [x] Rank tiers and progression visualization
 - [ ] Daily seeded leaderboards
 - [ ] Anti-abuse and validation checks
 
