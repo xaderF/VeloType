@@ -128,12 +128,12 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] Ranked matchmaking queue
 - [x] Server-side ELO rating system
 - [x] Rank tiers and progression visualization
-- [ ] Daily seeded leaderboards
+- [x] Daily seeded leaderboards
 - [ ] Anti-abuse and validation checks
 
-### Phase 4 — Real-Time Multiplayer
-- [ ] WebSocket-based match infrastructure
-- [ ] Server-authoritative 1v1 match flow
+### Phase 4 — Real-Time Multiplayer (In Progress)
+- [x] WebSocket-based match infrastructure
+- [x] Server-authoritative 1v1 match flow
 - [ ] Reconnect handling and match recovery
 - [ ] Latency and performance optimization
 
