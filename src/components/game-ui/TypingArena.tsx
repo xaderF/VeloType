@@ -13,8 +13,8 @@ interface TypingArenaProps {
   isActive: boolean;
   timeLimit?: number;
   onComplete?: (stats: RoundStats) => void;
-  /** Called alongside onComplete with the raw typed string and per-second samples (for online mode) */
-  onCompleteRaw?: (typed: string, samples: number[]) => void;
+  /** Called alongside onComplete with the raw typed string, per-second samples, and keystroke-level error tracking (for online mode) */
+  onCompleteRaw?: (typed: string, samples: number[], totalErrors: number, totalKeystrokes: number) => void;
   /** Called every ~500ms with the current typing state (for online progress reporting) */
   onProgressUpdate?: (typed: string, cursor: number, errors: number, startedAtMs: number | null) => void;
   /** Hide distracting UI for a clean, Monkeytype-style focus experience */
@@ -76,7 +76,7 @@ export function TypingArena({
   // Report raw typed text + samples when finished (online mode)
   useEffect(() => {
     if (state.status === 'finished' && onCompleteRaw) {
-      onCompleteRaw(state.typed, state.samples);
+      onCompleteRaw(state.typed, state.samples, state.totalErrors, state.totalKeystrokes);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.status]);

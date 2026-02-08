@@ -54,6 +54,10 @@ export function computeConsistency(samples: number[]): number {
  *   In timed mode WPM is always calculated against this window — identical to
  *   how MonkeyType works — so a player who stops typing early does NOT get an
  *   inflated WPM; they simply have fewer correct chars in the same window.
+ * @param totalErrors - Cumulative errors including corrected ones (from client).
+ *   When provided, accuracy includes the penalty for corrected mistakes.
+ * @param totalKeystrokes - Total forward keystrokes (from client).
+ *   When provided alongside totalErrors, used for MonkeyType-style keystroke accuracy.
  */
 export function computeServerMetrics(
   target: string,
@@ -61,11 +65,25 @@ export function computeServerMetrics(
   elapsedMs: number,
   samples: number[],
   matchTimeLimitMs?: number,
+  totalErrors?: number,
+  totalKeystrokes?: number,
 ): ServerMetrics {
   const correctChars = countCorrectChars(target, typed);
   const totalTyped = typed.length;
   const errors = totalTyped - correctChars;
-  const accuracy = computeAccuracy(correctChars, totalTyped);
+
+  // Use keystroke-level accuracy when totalErrors/totalKeystrokes are available
+  // so corrected mistakes still count against accuracy (MonkeyType-style).
+  // Fall back to the simple position-level accuracy otherwise.
+  let accuracy: number;
+  if (totalKeystrokes != null && totalKeystrokes > 0 && totalErrors != null) {
+    // Sanity: totalKeystrokes must be >= typed.length, totalErrors must be reasonable
+    const sanitizedKeystrokes = Math.max(totalKeystrokes, totalTyped);
+    const sanitizedTotalErrors = Math.min(totalErrors, sanitizedKeystrokes);
+    accuracy = computeAccuracy(sanitizedKeystrokes - sanitizedTotalErrors, sanitizedKeystrokes);
+  } else {
+    accuracy = computeAccuracy(correctChars, totalTyped);
+  }
 
   // Use the full time window for WPM so early-submitters aren't rewarded.
   // Fall back to actual elapsed if no limit is provided (e.g. text mode).

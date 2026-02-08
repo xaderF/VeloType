@@ -34,6 +34,8 @@ function sendDatabaseUnavailable(reply: FastifyReply) {
 const submitSchema = z.object({
   typed: z.string().min(1).max(5000),       // what the user typed
   elapsedMs: z.number().int().positive(),   // how long in ms
+  totalErrors: z.number().int().nonnegative().optional(),    // cumulative errors incl. corrected
+  totalKeystrokes: z.number().int().nonnegative().optional(), // total forward keystrokes
 });
 
 const querySchema = z.object({
@@ -201,13 +203,13 @@ export async function leaderboardRoutes(app: FastifyInstance) {
 
       // Server-authoritative: regenerate text, compute metrics
       const targetText = generateText({ seed, length: 200, difficulty: 'medium', includePunctuation: false });
-      const { typed, elapsedMs } = parsed.data;
+      const { typed, elapsedMs, totalErrors, totalKeystrokes } = parsed.data;
 
       // Plausibility check — same cap as ranked (~20 chars/sec)
       const maxChars = Math.ceil((elapsedMs / 1000) * 20);
       const clampedTyped = typed.slice(0, Math.min(typed.length, maxChars, targetText.length));
 
-      const metrics = computeServerMetrics(targetText, clampedTyped, elapsedMs, []);
+      const metrics = computeServerMetrics(targetText, clampedTyped, elapsedMs, [], undefined, totalErrors, totalKeystrokes);
       const perfScore = performanceScore(metrics.wpm, metrics.accuracy, metrics.consistency);
 
       const record = await db.dailyScore.create({

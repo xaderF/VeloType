@@ -64,6 +64,10 @@ export default function DailyChallenge() {
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Keystroke-level error tracking (same as typing engine)
+  const totalErrorsRef = useRef(0);
+  const totalKeystrokesRef = useRef(0);
+
   // Fetch daily info + leaderboard
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -110,7 +114,12 @@ export default function DailyChallenge() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ typed: text, elapsedMs: elapsed }),
+        body: JSON.stringify({
+          typed: text,
+          elapsedMs: elapsed,
+          totalErrors: totalErrorsRef.current,
+          totalKeystrokes: totalKeystrokesRef.current,
+        }),
       });
 
       if (res.ok) {
@@ -147,6 +156,18 @@ export default function DailyChallenge() {
       if (!daily || phase !== 'playing') return;
       const value = e.target.value;
       if (value.length > daily.targetText.length) return;
+
+      // Track keystroke-level errors for accuracy
+      if (value.length > typed.length) {
+        // Forward typing (new character added)
+        const newCharIdx = value.length - 1;
+        totalKeystrokesRef.current += 1;
+        if (value[newCharIdx] !== daily.targetText[newCharIdx]) {
+          totalErrorsRef.current += 1;
+        }
+      }
+      // Backspace doesn't affect totalErrors or totalKeystrokes (matches engine behavior)
+
       setTyped(value);
 
       // Auto-finish when they've typed enough
@@ -154,7 +175,7 @@ export default function DailyChallenge() {
         setTimeout(() => finishChallenge(value), 50);
       }
     },
-    [daily, phase, finishChallenge],
+    [daily, phase, typed, finishChallenge],
   );
 
   const startChallenge = () => {
@@ -162,6 +183,8 @@ export default function DailyChallenge() {
     setPhase('playing');
     setTyped('');
     setStartTime(Date.now());
+    totalErrorsRef.current = 0;
+    totalKeystrokesRef.current = 0;
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 

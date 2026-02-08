@@ -11,6 +11,8 @@ import {
   OpponentProgressPayload,
   MatchCompletePayload,
   MatchCompletePlayer,
+  MatchStateRecoveryPayload,
+  LatencyStats,
 } from '@/services/socket';
 import { generateText } from '@/game/engine';
 
@@ -24,7 +26,8 @@ export type OnlineMatchPhase =
   | 'match_found'
   | 'countdown'
   | 'playing'
-  | 'waiting_opponent'  // we submitted, waiting for them
+  | 'reconnecting'       // disconnected mid-match, auto-reconnecting
+  | 'waiting_opponent'   // we submitted, waiting for them
   | 'complete';
 
 export interface OpponentInfo {
@@ -66,6 +69,11 @@ export function useOnlineMatch(authToken: string | null) {
   const [matchResult, setMatchResult] = useState<OnlineMatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Latency & reconnect state
+  const [latency, setLatency] = useState<LatencyStats | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const phaseBeforeDisconnectRef = useRef<OnlineMatchPhase | null>(null);
+
   // Refs for socket instances
   const mmSocketRef = useRef<ReturnType<typeof createMatchmakingSocket> | null>(null);
   const liveSocketRef = useRef<ReturnType<typeof createLiveMatchSocket> | null>(null);
@@ -76,6 +84,7 @@ export function useOnlineMatch(authToken: string | null) {
   const handleMatchFoundRef = useRef<(data: MatchFoundPayload) => void>(() => {});
   const startCountdownRef = useRef<(targetStartAt: number) => void>(() => {});
   const handleMatchCompleteRef = useRef<(data: MatchCompletePayload) => void>(() => {});
+  const handleStateRecoveryRef = useRef<(data: MatchStateRecoveryPayload) => void>(() => {});
   // Track latest typed state for progress reporting
   const typedStateRef = useRef<{ typed: string; cursor: number; errors: number; startedAtMs: number | null }>({
     typed: '', cursor: 0, errors: 0, startedAtMs: null,
@@ -201,8 +210,34 @@ export function useOnlineMatch(authToken: string | null) {
       onMatchComplete: (complete: MatchCompletePayload) => {
         handleMatchCompleteRef.current(complete);
       },
+      onMatchStateRecovery: (recovery: MatchStateRecoveryPayload) => {
+        handleStateRecoveryRef.current(recovery);
+      },
+      onLatencyUpdate: (stats: LatencyStats) => {
+        setLatency(stats);
+      },
+      onReconnecting: (attempt: number) => {
+        // Save current phase so we can restore it after reconnection
+        setPhase((prev) => {
+          if (prev !== 'reconnecting') {
+            phaseBeforeDisconnectRef.current = prev;
+          }
+          return 'reconnecting';
+        });
+        setReconnectAttempt(attempt);
+      },
+      onReconnected: () => {
+        // Restore the phase we were in before disconnect
+        // (state recovery message will update as needed)
+        const prevPhase = phaseBeforeDisconnectRef.current;
+        if (prevPhase && prevPhase !== 'reconnecting') {
+          setPhase(prevPhase);
+        }
+        setReconnectAttempt(0);
+        phaseBeforeDisconnectRef.current = null;
+      },
       onError: (msg) => setError(msg),
-      onClose: () => { /* handle reconnect if needed */ },
+      onClose: () => { /* socket fully closed, no more reconnect attempts */ },
     });
 
     live.join(data.matchId, authToken!);
@@ -263,13 +298,13 @@ export function useOnlineMatch(authToken: string | null) {
   }, []);
 
   // ------ Submit result ------
-  const submitResult = useCallback((typed: string) => {
+  const submitResult = useCallback((typed: string, totalErrors?: number, totalKeystrokes?: number) => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
     }
 
-    liveSocketRef.current?.sendResult(typed, samplesRef.current);
+    liveSocketRef.current?.sendResult(typed, samplesRef.current, totalErrors, totalKeystrokes);
     setPhase('waiting_opponent');
   }, []);
 
@@ -303,6 +338,36 @@ export function useOnlineMatch(authToken: string | null) {
     handleMatchCompleteRef.current = handleMatchComplete;
   }, [handleMatchComplete]);
 
+  // ------ State recovery on reconnect ------
+  const handleStateRecovery = useCallback((data: MatchStateRecoveryPayload) => {
+    // Restore opponent progress from the server's last known state
+    const oppEntries = Object.entries(data.opponentProgress);
+    if (oppEntries.length > 0) {
+      const [, prog] = oppEntries[0];
+      setOpponentProgress({
+        progressIndex: prog.progressIndex,
+        typedLength: prog.typedLength,
+        mistakesCount: prog.mistakesCount,
+        elapsedMs: prog.elapsedMs,
+      });
+    }
+
+    // Restore opponent finished state
+    if (data.opponentFinished.length > 0) {
+      setOpponentFinished(true);
+    }
+
+    // If we're supposed to be playing but haven't started progress reporting,
+    // resume it (e.g. reconnected during playing phase)
+    if (phaseBeforeDisconnectRef.current === 'playing' && !progressIntervalRef.current) {
+      startProgressReporting();
+    }
+  }, []);
+
+  useEffect(() => {
+    handleStateRecoveryRef.current = handleStateRecovery;
+  }, [handleStateRecovery]);
+
   // ------ Reset ------
   const resetMatch = useCallback(() => {
     cleanup();
@@ -319,6 +384,9 @@ export function useOnlineMatch(authToken: string | null) {
     setOpponentFinished(false);
     setMatchResult(null);
     setError(null);
+    setLatency(null);
+    setReconnectAttempt(0);
+    phaseBeforeDisconnectRef.current = null;
     typedStateRef.current = { typed: '', cursor: 0, errors: 0, startedAtMs: null };
     progressIndexRef.current = 0;
     samplesRef.current = [];
@@ -340,6 +408,8 @@ export function useOnlineMatch(authToken: string | null) {
     opponentFinished,
     matchResult,
     error,
+    latency,
+    reconnectAttempt,
 
     // Actions
     joinQueue,

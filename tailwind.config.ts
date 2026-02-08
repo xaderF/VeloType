@@ -76,6 +76,13 @@ export default {
           low: "hsl(var(--hp-low))",
         },
         damage: "hsl(var(--damage))",
+        lobby: {
+          bg: "hsl(var(--lobby-bg))",
+          text: {
+            DEFAULT: "hsl(var(--lobby-text))",
+            muted: "hsl(var(--lobby-text-muted))",
+          },
+        },
         typing: {
           correct: "hsl(var(--typing-correct))",
           error: "hsl(var(--typing-error))",

@@ -2,10 +2,13 @@
 // main page component — supports both offline (simulated) and online (WebSocket) modes.
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGameState } from '@/hooks/useGameState';
 import { useAuth } from '@/hooks/useAuth';
 import { useOnlineMatch } from '@/hooks/useOnlineMatch';
 import { HomeScreen } from '@/components/screens/HomeScreen';
+import { PlayModeSelect, type GameMode } from '@/components/screens/PlayModeSelect';
+import { SettingsPanel } from '@/components/screens/SettingsPanel';
 import { PlayScreen } from '@/components/screens/PlayScreen';
 import { ResultsScreen } from '@/components/screens/ResultsScreen';
 import { QueueOverlay } from '@/components/game-ui/QueueOverlay';
@@ -15,7 +18,6 @@ import { RoundEndOverlay } from '@/components/game-ui/RoundEndOverlay';
 import { TypingOptionsBar } from '@/components/game-ui/TypingOptionsBar';
 import { RoundStats, getRankFromRating } from '@/utils/scoring';
 import { TypingArena } from '@/components/game-ui/TypingArena';
-import { RankBadge } from '@/components/game-ui/RankBadge';
 import { WpmChart } from '@/components/game-ui/WpmChart';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -349,8 +351,18 @@ function OnlineResultsScreen({
 
 const Index = () => {
   const auth = useAuth();
+  const navigate = useNavigate();
   const [showAuth, setShowAuth] = useState(false);
   const [playMode, setPlayMode] = useState<'offline' | 'online' | 'practice'>('offline');
+  const [showModeSelect, setShowModeSelect] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Last match result for the right sidebar
+  const [lastMatchData, setLastMatchData] = useState<{
+    wpm: number;
+    accuracy: number;
+    result: 'win' | 'loss' | 'draw';
+  } | null>(null);
 
   // Practice mode state
   const [practicePhase, setPracticePhase] = useState<'typing' | 'results'>('typing');
@@ -389,12 +401,14 @@ const Index = () => {
       setShowAuth(true);
       return;
     }
+    setShowModeSelect(false);
     setPlayMode('online');
     online.joinQueue();
   }, [auth.isAuthenticated, online]);
 
   // Start offline practice
   const startOfflineQueue = useCallback(() => {
+    setShowModeSelect(false);
     setPlayMode('offline');
     offline.startQueue();
   }, [offline]);
@@ -411,8 +425,23 @@ const Index = () => {
     setPracticePhase('typing');
     setPracticeStarted(false);
     setPracticeKey((k) => k + 1);
+    setShowModeSelect(false);
     setPlayMode('practice');
   }, [practicePunctuation]);
+
+  // Open the mode-select sub-screen
+  const openModeSelect = useCallback(() => {
+    setShowModeSelect(true);
+  }, []);
+
+  // Handle mode selection from PlayModeSelect
+  const handleModeSelect = useCallback((mode: GameMode) => {
+    switch (mode) {
+      case 'competitive': startOnlineQueue(); break;
+      case 'bot': startOfflineQueue(); break;
+      case 'freetype': startPractice(); break;
+    }
+  }, [startOnlineQueue, startOfflineQueue, startPractice]);
 
   // Restart practice with new text
   const restartPractice = useCallback(() => {
@@ -439,8 +468,8 @@ const Index = () => {
     // Stats are secondary; server computes official metrics from typed text
   }, []);
 
-  const handleOnlineCompleteRaw = useCallback((typed: string, samples: number[]) => {
-    online.submitResult(typed);
+  const handleOnlineCompleteRaw = useCallback((typed: string, samples: number[], totalErrors: number, totalKeystrokes: number) => {
+    online.submitResult(typed, totalErrors, totalKeystrokes);
   }, [online]);
 
   const handleOnlineProgressUpdate = useCallback((typed: string, cursor: number, errors: number, startedAtMs: number | null) => {
@@ -545,7 +574,14 @@ const Index = () => {
           <HomeScreen
             username={auth.user?.username ?? 'Player'}
             rating={auth.user?.rating ?? null}
-            onPlayRanked={startOnlineQueue}
+            isAuthenticated={auth.isAuthenticated}
+            lastMatch={lastMatchData}
+            onPlay={openModeSelect}
+            onCareer={() => navigate('/profile')}
+            onLeaderboard={() => navigate('/leaderboard')}
+            onSettings={() => setShowSettings(true)}
+            onLogin={() => setShowAuth(true)}
+            onLogout={auth.logout}
           />
         )}
 
@@ -554,7 +590,14 @@ const Index = () => {
             <HomeScreen
               username={auth.user?.username ?? 'Player'}
               rating={auth.user?.rating ?? null}
-              onPlayRanked={startOnlineQueue}
+              isAuthenticated={auth.isAuthenticated}
+              lastMatch={lastMatchData}
+              onPlay={openModeSelect}
+              onCareer={() => navigate('/profile')}
+              onLeaderboard={() => navigate('/leaderboard')}
+              onSettings={() => setShowSettings(true)}
+              onLogin={() => setShowAuth(true)}
+              onLogout={auth.logout}
             />
             <QueueOverlay
               isVisible
@@ -570,7 +613,14 @@ const Index = () => {
             <HomeScreen
               username={auth.user?.username ?? 'Player'}
               rating={auth.user?.rating ?? null}
-              onPlayRanked={() => {}}
+              isAuthenticated={auth.isAuthenticated}
+              lastMatch={lastMatchData}
+              onPlay={() => {}}
+              onCareer={() => {}}
+              onLeaderboard={() => {}}
+              onSettings={() => {}}
+              onLogin={() => {}}
+              onLogout={() => {}}
             />
             <MatchFoundOverlay
               isVisible
@@ -604,26 +654,95 @@ const Index = () => {
 
         {/* Playing */}
         {(online.phase === 'playing' || online.phase === 'waiting_opponent') && (
-          <OnlinePlayScreen
-            targetText={online.targetText}
-            timeLimit={online.matchConfig?.limit ?? 30}
-            punctuationEnabled={online.matchConfig?.includePunctuation ?? false}
-            opponent={online.opponent}
-            opponentProgress={online.opponentProgress}
-            userId={online.userId}
-            onComplete={handleOnlineRoundComplete}
-            onCompleteRaw={handleOnlineCompleteRaw}
-            onProgressUpdate={handleOnlineProgressUpdate}
-            onForfeit={handleOnlineForfeit}
-          />
+          <>
+            <OnlinePlayScreen
+              targetText={online.targetText}
+              timeLimit={online.matchConfig?.limit ?? 30}
+              punctuationEnabled={online.matchConfig?.includePunctuation ?? false}
+              opponent={online.opponent}
+              opponentProgress={online.opponentProgress}
+              userId={online.userId}
+              onComplete={handleOnlineRoundComplete}
+              onCompleteRaw={handleOnlineCompleteRaw}
+              onProgressUpdate={handleOnlineProgressUpdate}
+              onForfeit={handleOnlineForfeit}
+            />
+            {/* Latency indicator */}
+            {online.latency && (
+              <div className="fixed top-4 right-4 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/80 border border-border text-xs font-mono text-muted-foreground backdrop-blur-sm">
+                <span
+                  className={cn(
+                    'w-2 h-2 rounded-full',
+                    online.latency.smoothedRtt < 80 ? 'bg-hp-full' :
+                    online.latency.smoothedRtt < 150 ? 'bg-yellow-500' : 'bg-damage',
+                  )}
+                />
+                {Math.round(online.latency.smoothedRtt)}ms
+                {online.latency.jitter > 15 && (
+                  <span className="text-yellow-500 ml-1">±{Math.round(online.latency.jitter)}</span>
+                )}
+              </div>
+            )}
+          </>
         )}
+
+        {/* Reconnecting overlay */}
+        <AnimatePresence>
+          {online.phase === 'reconnecting' && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                className="w-full max-w-sm p-6 rounded-2xl border border-yellow-500/50 bg-card shadow-2xl space-y-4 text-center"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <div className="flex justify-center">
+                  <motion.div
+                    className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                  />
+                </div>
+                <div className="text-lg font-bold text-yellow-500">
+                  Reconnecting...
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Attempt {online.reconnectAttempt} of 10
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Your match will resume once reconnected
+                </div>
+                <button
+                  onClick={() => { online.resetMatch(); setPlayMode('offline'); }}
+                  className="mt-2 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
+                >
+                  Leave Match
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Complete */}
         {online.phase === 'complete' && online.matchResult && (
           <OnlineResultsScreen
             matchResult={online.matchResult}
             opponent={online.opponent}
-            onPlayAgain={() => { online.resetMatch(); setPlayMode('offline'); }}
+            onPlayAgain={() => {
+              // Store last match for lobby sidebar
+              setLastMatchData({
+                wpm: online.matchResult!.myResult.wpm,
+                accuracy: online.matchResult!.myResult.accuracy,
+                result: online.matchResult!.myResult.result as 'win' | 'loss' | 'draw',
+              });
+              online.resetMatch();
+              setPlayMode('offline');
+            }}
           />
         )}
 
@@ -634,6 +753,16 @@ const Index = () => {
           </div>
         )}
 
+        <PlayModeSelect
+          isVisible={showModeSelect}
+          isAuthenticated={auth.isAuthenticated}
+          onSelectMode={handleModeSelect}
+          onBack={() => setShowModeSelect(false)}
+          onLogin={() => setShowAuth(true)}
+        />
+
+        <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
         {showAuth && <AuthPanel auth={auth} onClose={() => { setShowAuth(false); setPlayMode('offline'); }} />}
       </div>
     );
@@ -643,6 +772,21 @@ const Index = () => {
   if (playMode === 'practice') {
     return (
       <div className="min-h-screen bg-background flex flex-col">
+        {/* Persistent exit button — always accessible, even during typing */}
+        <div className="absolute top-4 left-4 z-30">
+          <button
+            onClick={() => {
+              setPracticePhase('typing');
+              setPracticeResults(null);
+              setPracticeStarted(false);
+              setPlayMode('offline');
+            }}
+            className="px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
+          >
+            ✕ Exit
+          </button>
+        </div>
+
         {/* Header — hidden during active typing for focus */}
         <AnimatePresence>
           {(!practiceStarted || practicePhase === 'results') && (
@@ -653,18 +797,11 @@ const Index = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  onClick={() => setPlayMode('offline')}
-                  className="px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
-                >
-                  ✕ Exit
-                </button>
+              <div className="flex items-center justify-center mb-4">
                 <h1 className="text-xl font-bold tracking-tight">
                   <span className="text-primary">Velo</span>
                   <span className="text-foreground">Type</span>
                 </h1>
-                <div className="w-12" /> {/* Spacer for centering */}
               </div>
             </motion.div>
           )}
@@ -853,130 +990,38 @@ const Index = () => {
           </div>
         </div>
 
+        <PlayModeSelect
+          isVisible={showModeSelect}
+          isAuthenticated={auth.isAuthenticated}
+          onSelectMode={handleModeSelect}
+          onBack={() => setShowModeSelect(false)}
+          onLogin={() => setShowAuth(true)}
+        />
+
+        <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
         {showAuth && <AuthPanel auth={auth} onClose={() => setShowAuth(false)} />}
       </div>
     );
   }
 
-  // ---- OFFLINE MODE rendering (original simulated) ----
+  // ---- OFFLINE MODE rendering  // ---- OFFLINE MODE rendering (original simulated) ----
   return (
     <div className="min-h-screen bg-background">
       {/* Home with both play options */}
       {(offline.phase === 'home' || offline.phase === 'queue' || offline.phase === 'match_found') && (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
-          <motion.div
-            className="relative z-10 text-center space-y-12 max-w-lg"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-2">
-                <span className="text-primary">Velo</span>
-                <span className="text-foreground">Type</span>
-              </h1>
-              <p className="text-muted-foreground">Minimal, deterministic 1v1 typing duels</p>
-            </motion.div>
-
-            {/* Player card */}
-            <motion.div
-              className="p-6 rounded-2xl border border-border bg-card/80 backdrop-blur-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <div className="flex items-center justify-center gap-4 mb-2">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-2xl border-2 border-primary">
-                  👤
-                </div>
-                <div className="text-left">
-                  <div className="text-lg font-semibold">{auth.user?.username ?? 'Player'}</div>
-                  {auth.user ? (
-                    <RankBadge rating={auth.user.rating} size="sm" />
-                  ) : (
-                    <span className="inline-block px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs font-semibold mt-1">Unranked</span>
-                  )}
-                </div>
-              </div>
-              {auth.isAuthenticated ? (
-                <button onClick={auth.logout} className="text-xs text-muted-foreground hover:text-foreground">
-                  Log out ({auth.user?.username})
-                </button>
-              ) : (
-                <button onClick={() => setShowAuth(true)} className="text-xs text-primary hover:underline">
-                  Log in to play ranked
-                </button>
-              )}
-            </motion.div>
-
-            <TypingOptionsBar
-              punctuationEnabled={offline.practiceSettings.punctuation}
-              timeLimit={offline.practiceSettings.timeLimitSeconds}
-              onTogglePunctuation={() =>
-                offline.updatePracticeSettings({ punctuation: !offline.practiceSettings.punctuation })
-              }
-              onTimeLimitChange={(seconds) =>
-                offline.updatePracticeSettings({ timeLimitSeconds: seconds as 15 | 30 | 60 | 120 })
-              }
-            />
-
-            {/* Play buttons */}
-            <div className="flex flex-col gap-3">
-              <motion.button
-                onClick={startOnlineQueue}
-                className={cn(
-                  'w-full py-4 px-8 rounded-xl font-bold text-lg',
-                  'bg-secondary text-foreground',
-                  'hover:bg-primary hover:text-primary-foreground hover:glow-primary-intense',
-                  'transition-all duration-300',
-                  'border border-border',
-                )}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                Competitive
-              </motion.button>
-
-              <motion.button
-                onClick={startOfflineQueue}
-                className={cn(
-                  'w-full py-4 px-8 rounded-xl font-bold text-lg',
-                  'bg-secondary text-foreground',
-                  'hover:bg-primary hover:text-primary-foreground hover:glow-primary-intense',
-                  'transition-all duration-300',
-                  'border border-border',
-                )}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                Robo
-              </motion.button>
-
-              <motion.button
-                onClick={startPractice}
-                className={cn(
-                  'w-full py-4 px-8 rounded-xl font-bold text-lg',
-                  'bg-secondary text-foreground',
-                  'hover:bg-primary hover:text-primary-foreground hover:glow-primary-intense',
-                  'transition-all duration-300',
-                  'border border-border',
-                )}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                FreeType
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
+        <HomeScreen
+          username={auth.user?.username ?? 'Player'}
+          rating={auth.user?.rating ?? null}
+          isAuthenticated={auth.isAuthenticated}
+          lastMatch={lastMatchData}
+          onPlay={openModeSelect}
+          onCareer={() => navigate('/profile')}
+          onLeaderboard={() => navigate('/leaderboard')}
+          onSettings={() => setShowSettings(true)}
+          onLogin={() => setShowAuth(true)}
+          onLogout={auth.logout}
+        />
       )}
 
       {(offline.phase === 'countdown' || offline.phase === 'playing' || offline.phase === 'round_end') && offline.match && (
@@ -1022,6 +1067,16 @@ const Index = () => {
         onOfferDraw={offline.offerDraw}
         breakSeconds={15}
       />
+
+      <PlayModeSelect
+        isVisible={showModeSelect}
+        isAuthenticated={auth.isAuthenticated}
+        onSelectMode={handleModeSelect}
+        onBack={() => setShowModeSelect(false)}
+        onLogin={() => setShowAuth(true)}
+      />
+
+      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {showAuth && <AuthPanel auth={auth} onClose={() => setShowAuth(false)} />}
     </div>

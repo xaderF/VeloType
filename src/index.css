@@ -67,6 +67,11 @@
     --typing-current: 210 100% 70%;
     --typing-pending: 210 6% 45%;
 
+    /* Lobby — near-black background, single accent */
+    --lobby-bg: 220 12% 8%;
+    --lobby-text: 0 0% 92%;
+    --lobby-text-muted: 220 8% 45%;
+
     /* Glow effects toned down for minimalism */
     --glow-primary: 45 85% 55%;
     --glow-damage: 0 72% 55%;

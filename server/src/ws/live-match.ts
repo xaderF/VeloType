@@ -40,6 +40,8 @@ interface PlayerSubmission {
   typed: string;
   samples: number[];
   submitTime: number;    // epoch ms
+  totalErrors?: number;      // cumulative errors incl. corrected (from client)
+  totalKeystrokes?: number;  // total forward keystrokes (from client)
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +59,63 @@ const matchSubmissions = new Map<string, Map<string, PlayerSubmission>>();
 
 /** Per-second progress samples stored during the match for consistency */
 const matchProgressSamples = new Map<string, Map<string, number[]>>();
+
+// ---------------------------------------------------------------------------
+// Reconnect grace — track disconnected players so they can resume
+// ---------------------------------------------------------------------------
+
+interface DisconnectedPlayer {
+  matchId: string;
+  userId: string;
+  disconnectedAt: number;
+}
+
+/** Players who disconnected mid-match; kept for RECONNECT_GRACE_MS */
+const disconnectedPlayers = new Map<string, DisconnectedPlayer>(); // keyed by `matchId:userId`
+
+/** How long a disconnected player can reconnect before forfeiting */
+const RECONNECT_GRACE_MS = 30_000;
+
+/** Latest progress snapshot per player (for state recovery on reconnect) */
+const latestProgress = new Map<string, Map<string, {
+  progressIndex: number;
+  typedLength: number;
+  mistakesCount: number;
+  elapsedMs: number;
+}>>();
+
+function markDisconnected(matchId: string, userId: string) {
+  const key = `${matchId}:${userId}`;
+  disconnectedPlayers.set(key, { matchId, userId, disconnectedAt: Date.now() });
+
+  // Auto-forfeit after grace period
+  setTimeout(() => {
+    const entry = disconnectedPlayers.get(key);
+    if (entry) {
+      disconnectedPlayers.delete(key);
+      // If match is still active and player hasn't reconnected, auto-submit empty result
+      const config = activeMatchConfigs.get(matchId);
+      const subs = matchSubmissions.get(matchId);
+      if (config && (!subs || !subs.has(userId))) {
+        if (!matchSubmissions.has(matchId)) matchSubmissions.set(matchId, new Map());
+        matchSubmissions.get(matchId)!.set(userId, {
+          typed: '',
+          samples: [],
+          submitTime: Date.now(),
+        });
+        // Check if all players have now submitted
+        const totalPlayers = config.playerIds.length;
+        if (matchSubmissions.get(matchId)!.size >= totalPlayers) {
+          void finaliseMatch(matchId);
+        }
+      }
+    }
+  }, RECONNECT_GRACE_MS);
+}
+
+function clearDisconnected(matchId: string, userId: string) {
+  disconnectedPlayers.delete(`${matchId}:${userId}`);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,6 +136,14 @@ function removeSocketFromRoom(socket: WebSocket) {
 
   room.delete(context.userId);
   socketContexts.delete(socket);
+
+  // If the match is still active, mark as disconnected (grace period)
+  const config = activeMatchConfigs.get(context.matchId);
+  const subs = matchSubmissions.get(context.matchId);
+  const hasSubmitted = subs?.has(context.userId) ?? false;
+  if (config && !hasSubmitted) {
+    markDisconnected(context.matchId, context.userId);
+  }
 
   if (room.size === 0) {
     rooms.delete(context.matchId);
@@ -221,6 +288,8 @@ async function finaliseMatch(matchId: string) {
       Math.max(elapsedMs, 1),
       progressSamples,
       matchTimeLimitMs,
+      sub.totalErrors,
+      sub.totalKeystrokes,
     );
 
     const pScore = performanceScore(metrics.wpm, metrics.accuracy, metrics.consistency);
@@ -510,6 +579,11 @@ async function finaliseMatch(matchId: string) {
   activeMatchConfigs.delete(matchId);
   matchSubmissions.delete(matchId);
   matchProgressSamples.delete(matchId);
+  latestProgress.delete(matchId);
+  // Clear any disconnect grace entries for this match
+  for (const [key] of disconnectedPlayers) {
+    if (key.startsWith(`${matchId}:`)) disconnectedPlayers.delete(key);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -528,6 +602,8 @@ const resultSchema = z.object({
   type: z.literal('result'),
   typed: z.string().max(10_000),                       // raw typed text
   samples: z.array(z.number()).max(300).default([]),   // per-second WPM samples
+  totalErrors: z.number().int().nonnegative().optional(),    // cumulative errors incl. corrected
+  totalKeystrokes: z.number().int().nonnegative().optional(), // total forward keystrokes
 });
 
 // ---------------------------------------------------------------------------
@@ -598,6 +674,12 @@ export async function liveMatchWs(app: FastifyInstance) {
           // Include match config so client generates identical text
           const config = activeMatchConfigs.get(joinPayload.data.matchId);
 
+          // Clear reconnect grace if this is a reconnection
+          clearDisconnected(joinPayload.data.matchId, authUser.id);
+
+          // Check if this is a reconnect (match already started)
+          const isReconnect = config ? Date.now() > config.startAt : false;
+
           send(socket, {
             type: 'joined',
             matchId: joinPayload.data.matchId,
@@ -612,6 +694,44 @@ export async function liveMatchWs(app: FastifyInstance) {
               startAt: config.startAt,
             } : null,
           });
+
+          // If reconnecting mid-match, send current state recovery
+          if (isReconnect && config) {
+            const matchProgress = latestProgress.get(joinPayload.data.matchId);
+            const opponentProgressData: Record<string, {
+              progressIndex: number;
+              typedLength: number;
+              mistakesCount: number;
+              elapsedMs: number;
+            }> = {};
+            const opponentFinishedList: string[] = [];
+
+            if (matchProgress) {
+              for (const [uid, prog] of matchProgress.entries()) {
+                if (uid !== authUser.id) {
+                  opponentProgressData[uid] = prog;
+                }
+              }
+            }
+
+            // Check which opponents have already submitted
+            const subs = matchSubmissions.get(joinPayload.data.matchId);
+            if (subs) {
+              for (const [uid] of subs.entries()) {
+                if (uid !== authUser.id) {
+                  opponentFinishedList.push(uid);
+                }
+              }
+            }
+
+            send(socket, {
+              type: 'match_state_recovery',
+              matchId: joinPayload.data.matchId,
+              serverTime: Date.now(),
+              opponentProgress: opponentProgressData,
+              opponentFinished: opponentFinishedList,
+            });
+          }
 
           // Notify other players
           room.forEach((memberSocket, userId) => {
@@ -650,6 +770,17 @@ export async function liveMatchWs(app: FastifyInstance) {
             matchSamples.set(context.userId, []);
           }
           matchSamples.get(context.userId)!.push(payload.data.typedLength);
+
+          // Store latest progress for reconnect state recovery
+          if (!latestProgress.has(context.matchId)) {
+            latestProgress.set(context.matchId, new Map());
+          }
+          latestProgress.get(context.matchId)!.set(context.userId, {
+            progressIndex: payload.data.progressIndex,
+            typedLength: payload.data.typedLength,
+            mistakesCount: payload.data.mistakesCount,
+            elapsedMs: payload.data.elapsedMs,
+          });
 
           // Relay to opponent
           const room = rooms.get(context.matchId);
@@ -706,6 +837,8 @@ export async function liveMatchWs(app: FastifyInstance) {
             typed: payload.data.typed,
             samples: payload.data.samples,
             submitTime: now,
+            totalErrors: payload.data.totalErrors,
+            totalKeystrokes: payload.data.totalKeystrokes,
           });
 
           send(socket, { type: 'result_received', matchId: context.matchId });
@@ -733,6 +866,17 @@ export async function liveMatchWs(app: FastifyInstance) {
           if (subs.size >= totalPlayers) {
             await finaliseMatch(context.matchId);
           }
+          return;
+        }
+
+        // ---- PING (latency measurement) ----
+        if (message.type === 'ping') {
+          const clientTs = typeof message.clientTs === 'number' ? message.clientTs : 0;
+          send(socket, {
+            type: 'pong',
+            clientTs,
+            serverTs: Date.now(),
+          });
           return;
         }
 
