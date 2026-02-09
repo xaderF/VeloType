@@ -5,6 +5,7 @@ const TIME_OPTIONS = [15, 30, 60, 120] as const;
 interface TypingOptionsBarProps {
   punctuationEnabled: boolean;
   timeLimit: number;
+  allowEndless?: boolean;
   onTogglePunctuation?: () => void;
   onTimeLimitChange?: (seconds: number) => void;
   className?: string;
@@ -23,6 +24,7 @@ function getButtonClass(active: boolean, interactive: boolean) {
 export function TypingOptionsBar({
   punctuationEnabled,
   timeLimit,
+  allowEndless = false,
   onTogglePunctuation,
   onTimeLimitChange,
   className,
@@ -76,6 +78,20 @@ export function TypingOptionsBar({
             {seconds}
           </button>
         ))}
+
+        {allowEndless && (
+          <button
+            type="button"
+            onClick={() => onTimeLimitChange?.(0)}
+            disabled={!canChangeTime}
+            className={cn(
+              'rounded-md px-3 py-1 text-xs font-medium transition-colors md:text-sm',
+              getButtonClass(timeLimit === 0, canChangeTime),
+            )}
+          >
+            ∞
+          </button>
+        )}
       </div>
     </div>
   );

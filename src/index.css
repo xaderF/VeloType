@@ -224,6 +224,27 @@
 }
 
 @layer utilities {
+  .round-recap-scrollbar {
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.65) hsl(var(--muted) / 0.45);
+  }
+
+  .round-recap-scrollbar::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  .round-recap-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.35);
+    border-radius: 999px;
+  }
+
+  .round-recap-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, hsl(var(--primary) / 0.75), hsl(var(--primary) / 0.55));
+    border-radius: 999px;
+    border: 2px solid hsl(var(--muted) / 0.35);
+  }
+
   /* Animation utilities */
   .animate-pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;

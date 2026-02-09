@@ -10,7 +10,11 @@ npm install
 
 2) Env
 - Create a `.env` file in the project root and fill values.
-- Used vars: `PORT` (default 4000), `DATABASE_URL` (Postgres), `AUTH_SECRET` (optional now).
+- Used vars:
+  - `PORT` (default 4000)
+  - `DATABASE_URL` (Postgres)
+  - `AUTH_SECRET` (optional now)
+  - `DAILY_RESET_TIMEZONE` (IANA tz for daily challenge rollover, default `America/New_York`)
 
 3) Run
 ```
@@ -40,3 +44,23 @@ npm run dev
 - Matchmaking pairs by rating, widening search range over time; sends `MATCH_FOUND` with matchId, seed, config, startAt.
 - Auth uses signed bearer tokens with `AUTH_SECRET` (falls back to a dev-only secret if unset).
 - If `DATABASE_URL` is set and migrations are applied, user/profile/match data is persisted via Prisma.
+
+## Round Score / Damage Reference
+
+For online rounds, server computes a normalized `roundScore` in `0..100`:
+
+- `damage = max(0, scoreA - scoreB)`
+- max round damage is `70`
+- score `100` means `100% accuracy` and `WPM >= (rank max + 10)`
+
+| Rank | MMR Range | Max WPM | WPM for score 100 |
+|---|---:|---:|---:|
+| Iron | 0-299 | 43 | 53 |
+| Bronze | 300-599 | 51 | 61 |
+| Silver | 600-899 | 59 | 69 |
+| Gold | 900-1199 | 67 | 77 |
+| Platinum | 1200-1499 | 75 | 85 |
+| Diamond | 1500-1799 | 85 | 95 |
+| Velocity | 1800-2099 | 97 | 107 |
+| Apex | 2100-2399 | 110 | 120 |
+| Paragon | 2400+ | 125 | 135 |

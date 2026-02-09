@@ -11,7 +11,7 @@ interface ResultsScreenProps {
   opponentStats: RoundStats;
   eloChange: number;
   newRating: number;
-  onPlayAgain: () => void;
+  onBackToMenu: () => void;
 }
 
 export function ResultsScreen({
@@ -20,7 +20,7 @@ export function ResultsScreen({
   opponentStats,
   eloChange,
   newRating,
-  onPlayAgain,
+  onBackToMenu,
 }: ResultsScreenProps) {
   const isWinner = match.winner === 'player';
   const oldRating = newRating - eloChange;
@@ -114,14 +114,13 @@ export function ResultsScreen({
           </div>
         </motion.div>
 
-        {/* Play again button */}
+        {/* Back to menu button */}
         <motion.button
-          onClick={onPlayAgain}
+          onClick={onBackToMenu}
           className={cn(
-            "w-full py-4 px-8 rounded-xl font-bold text-xl",
+            "w-full py-4 px-8 rounded-xl font-bold text-xl uppercase tracking-[0.08em]",
             "bg-primary text-primary-foreground",
-            "glow-primary hover:glow-primary-intense",
-            "transition-all duration-300"
+            "hover:bg-primary/90 transition-all duration-300"
           )}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -129,7 +128,7 @@ export function ResultsScreen({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          ⚔️ PLAY AGAIN
+          BACK TO MENU
         </motion.button>
       </div>
     </div>

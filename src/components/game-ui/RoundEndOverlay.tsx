@@ -1,6 +1,7 @@
 // RoundEndOverlay: Overlay shown at the end of a round. Used in TypingArena.
 // Depends on: framer-motion, RoundResultCard, RoundResult, cn util.
 // Props: isVisible, roundResult, onContinue, drawAvailable.
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RoundResultCard } from '@/components/game-ui/ResultCards';
 import { WpmChart } from '@/components/game-ui/WpmChart';
@@ -16,6 +17,11 @@ interface RoundEndOverlayProps {
   drawAccepted?: boolean;
   onOfferDraw?: () => void;
   breakSeconds?: number;
+  playerName?: string;
+  opponentName?: string;
+  playerHp?: number;
+  opponentHp?: number;
+  maxHp?: number;
 }
 
 export function RoundEndOverlay({
@@ -26,11 +32,45 @@ export function RoundEndOverlay({
   drawOffered = false,
   drawAccepted = false,
   onOfferDraw,
-  breakSeconds = 15,
+  breakSeconds = 7,
+  playerName = 'You',
+  opponentName = 'Opponent',
+  playerHp = 100,
+  opponentHp = 100,
+  maxHp = 100,
 }: RoundEndOverlayProps) {
-  if (!roundResult) return null;
+  const damageTaken = roundResult?.damageTaken ?? 0;
+  const damageDealt = roundResult?.damageDealt ?? 0;
+  const roundNumber = roundResult?.roundNumber ?? 0;
 
-  console.log('[RoundEndOverlay] wpmHistory:', roundResult.playerStats.wpmHistory?.length ?? 'undefined');
+  const preRoundPlayerHp = useMemo(
+    () => Math.max(0, Math.min(maxHp, playerHp + Math.max(0, damageTaken))),
+    [playerHp, damageTaken, maxHp],
+  );
+  const preRoundOpponentHp = useMemo(
+    () => Math.max(0, Math.min(maxHp, opponentHp + Math.max(0, damageDealt))),
+    [opponentHp, damageDealt, maxHp],
+  );
+
+  const [displayHp, setDisplayHp] = useState({ player: playerHp, opponent: opponentHp });
+  useEffect(() => {
+    if (!isVisible) return;
+
+    setDisplayHp({ player: preRoundPlayerHp, opponent: preRoundOpponentHp });
+    const timer = setTimeout(() => {
+      setDisplayHp({
+        player: Math.max(0, Math.min(maxHp, playerHp)),
+        opponent: Math.max(0, Math.min(maxHp, opponentHp)),
+      });
+    }, 220);
+
+    return () => clearTimeout(timer);
+  }, [isVisible, roundNumber, preRoundPlayerHp, preRoundOpponentHp, playerHp, opponentHp, maxHp]);
+
+  const playerPercent = Math.max(0, Math.min(100, (displayHp.player / Math.max(1, maxHp)) * 100));
+  const opponentPercent = Math.max(0, Math.min(100, (displayHp.opponent / Math.max(1, maxHp)) * 100));
+
+  if (!roundResult) return null;
 
   return (
     <AnimatePresence>
@@ -47,6 +87,41 @@ export function RoundEndOverlay({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
           >
+            <motion.div
+              className="mb-4 rounded-xl border border-border bg-card/70 p-4"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{playerName}</div>
+                  <div className="h-2 rounded-full bg-secondary overflow-hidden border border-border/70">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-hp-full/80 to-hp-full"
+                      initial={false}
+                      animate={{ width: `${playerPercent}%` }}
+                      transition={{ duration: 0.65, ease: 'easeOut' }}
+                    />
+                  </div>
+                  <div className="text-xs font-mono text-muted-foreground">{Math.round(displayHp.player)} HP</div>
+                </div>
+                <div className="text-sm font-semibold text-muted-foreground">VS</div>
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground text-right">{opponentName}</div>
+                  <div className="h-2 rounded-full bg-secondary overflow-hidden border border-border/70">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-primary/80 to-primary"
+                      initial={false}
+                      animate={{ width: `${opponentPercent}%` }}
+                      transition={{ duration: 0.65, ease: 'easeOut' }}
+                    />
+                  </div>
+                  <div className="text-xs font-mono text-muted-foreground text-right">{Math.round(displayHp.opponent)} HP</div>
+                </div>
+              </div>
+            </motion.div>
+
             <RoundResultCard
               roundNumber={roundResult.roundNumber}
               playerStats={roundResult.playerStats}

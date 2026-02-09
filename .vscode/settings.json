@@ -1,0 +1,22 @@
+{
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.vite/**": true,
+    "**/coverage/**": true,
+    "**/server/dist/**": true
+  },
+  "search.exclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.vite/**": true,
+    "**/coverage/**": true,
+    "**/server/dist/**": true
+  },
+  "files.exclude": {
+    "**/.vite": true,
+    "**/dist": true,
+    "**/coverage": true
+  }
+}

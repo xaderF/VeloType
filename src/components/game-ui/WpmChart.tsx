@@ -100,12 +100,13 @@ export function WpmChart({ data, className }: WpmChartProps) {
           <Line
             type="monotone"
             dataKey="raw"
-            stroke="hsl(var(--primary))"
-            strokeWidth={1.5}
-            strokeDasharray="5 3"
+            name="raw"
+            stroke="hsl(var(--muted-foreground))"
+            strokeWidth={1.75}
+            strokeDasharray="2 4"
             dot={false}
-            opacity={0.5}
-            activeDot={{ r: 3 }}
+            opacity={0.8}
+            activeDot={{ r: 3, fill: 'hsl(var(--muted-foreground))' }}
           />
           <Line
             type="stepAfter"

@@ -64,13 +64,22 @@ export function buildMetrics(state: TypingState, nowMs: number): TypingMetrics {
     : 0;
   const correctChars = countCorrectChars(state.target, state.typed);
   const totalTyped = state.typed.length;
-  // Accuracy uses totalKeystrokes (all keys ever pressed) and totalErrors
-  // so corrected mistakes still count against accuracy.
-  const accuracy = state.totalKeystrokes > 0
-    ? computeAccuracy(state.totalKeystrokes - state.totalErrors, state.totalKeystrokes)
+  const sanitizedTotalErrors = Math.max(0, state.totalErrors);
+  const sanitizedKeystrokes = Math.max(state.totalKeystrokes, totalTyped);
+
+  // Accuracy uses keystroke-level accounting so corrected mistakes still count
+  // against accuracy (MonkeyType-style behavior).
+  const accuracy = sanitizedKeystrokes > 0
+    ? computeAccuracy(sanitizedKeystrokes - sanitizedTotalErrors, sanitizedKeystrokes)
     : computeAccuracy(correctChars, totalTyped);
-  const rawWpm = computeRawWpm(totalTyped, elapsedMs);
-  const wpm = computeWpm(correctChars, elapsedMs);
+
+  // Raw speed reflects every typed key (including wrong keys that were fixed).
+  const rawWpm = computeRawWpm(sanitizedKeystrokes, elapsedMs);
+
+  // Game rule: every 3 corrected mistakes contributes +1 WPM (integer steps),
+  // while all mistakes still reduce accuracy.
+  const correctedErrors = Math.max(0, sanitizedTotalErrors - state.errors);
+  const wpm = computeWpm(correctChars, elapsedMs) + Math.floor(correctedErrors / 3);
   const consistency = computeConsistency(state.samples);
 
   return {

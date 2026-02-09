@@ -5,7 +5,8 @@
 import { useEffect, useRef } from 'react';
 
 const CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789;:\'",.<>/?[]{}|\\!@#$%^&*()'.split('');
-const PARTICLE_COUNT = 60;
+// Tuned for lower GPU/CPU load while keeping the same visual style.
+const PARTICLE_COUNT = 36;
 
 // ---------------------------------------------------------------------------
 // Letter particles
@@ -22,16 +23,21 @@ interface Particle {
   phase: number;
 }
 
-function createParticle(w: number, h: number, scattered = false): Particle {
+function createParticle(
+  w: number,
+  h: number,
+  rand: () => number,
+  scattered = false,
+): Particle {
   return {
-    x: Math.random() * w,
-    y: scattered ? Math.random() * h : h + 20,
-    char: CHARS[Math.floor(Math.random() * CHARS.length)],
-    size: 16 + Math.random() * 20,
-    opacity: 0.06 + Math.random() * 0.10,
-    speed: 0.15 + Math.random() * 0.35,
-    drift: (Math.random() - 0.5) * 0.3,
-    phase: Math.random() * Math.PI * 2,
+    x: rand() * w,
+    y: scattered ? rand() * h : h + 20,
+    char: CHARS[Math.floor(rand() * CHARS.length)],
+    size: 16 + rand() * 20,
+    opacity: 0.06 + rand() * 0.10,
+    speed: 0.15 + rand() * 0.35,
+    drift: (rand() - 0.5) * 0.3,
+    phase: rand() * Math.PI * 2,
   };
 }
 
@@ -91,21 +97,21 @@ interface AuroraCurtain {
   detail: number;
 }
 
-const AURORA_COUNT = 3;
+const AURORA_COUNT = 2;
 const AURORA_HUES = [185, 220, 275]; // turquoise / blue / purple
 
-function createAuroraCurtain(i: number): AuroraCurtain {
+function createAuroraCurtain(i: number, rand: () => number): AuroraCurtain {
   return {
-    baseY: 0.18 + i * 0.18 + Math.random() * 0.05,
-    hue: AURORA_HUES[i % AURORA_HUES.length] + (Math.random() * 16 - 8),
-    speed: 0.18 + Math.random() * 0.25,
-    phase: Math.random() * Math.PI * 2,
-    opacity: 0.05 + Math.random() * 0.04,   // much lower — ribbons are subtle structure
-    thickness: 0.22 + Math.random() * 0.18,
-    drift: 0.10 + Math.random() * 0.18,
-    waveAmp: 0.06 + Math.random() * 0.06,
-    waveFreq: 0.8 + Math.random() * 1.2,
-    detail: 1.6 + Math.random() * 1.6,
+    baseY: 0.18 + i * 0.18 + rand() * 0.05,
+    hue: AURORA_HUES[i % AURORA_HUES.length] + (rand() * 16 - 8),
+    speed: 0.18 + rand() * 0.25,
+    phase: rand() * Math.PI * 2,
+    opacity: 0.05 + rand() * 0.04,   // much lower — ribbons are subtle structure
+    thickness: 0.22 + rand() * 0.18,
+    drift: 0.10 + rand() * 0.18,
+    waveAmp: 0.06 + rand() * 0.06,
+    waveFreq: 0.8 + rand() * 1.2,
+    detail: 1.6 + rand() * 1.6,
   };
 }
 
@@ -126,21 +132,43 @@ interface AuroraGlow {
   wanderY: number;
 }
 
-const GLOW_COUNT = 5;
+const GLOW_COUNT = 4;
 const GLOW_HUES = [185, 205, 235, 260, 285];
 
-function createAuroraGlow(i: number): AuroraGlow {
+const GLOBAL_ANIMATION_START =
+  typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+function hashSeed(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createAuroraGlow(i: number, rand: () => number): AuroraGlow {
   return {
-    x: 0.1 + Math.random() * 0.8,
-    y: 0.15 + i * 0.14 + Math.random() * 0.08,
-    radiusX: 0.30 + Math.random() * 0.25,
-    radiusY: 0.10 + Math.random() * 0.10,
-    hue: GLOW_HUES[i % GLOW_HUES.length] + Math.random() * 12 - 6,
-    speed: 0.5 + Math.random() * 0.6,
-    phase: Math.random() * Math.PI * 2,
-    opacity: 0.18 + Math.random() * 0.14,
-    wanderX: 0.06 + Math.random() * 0.10,
-    wanderY: 0.06 + Math.random() * 0.12,
+    x: 0.1 + rand() * 0.8,
+    y: 0.15 + i * 0.14 + rand() * 0.08,
+    radiusX: 0.30 + rand() * 0.25,
+    radiusY: 0.10 + rand() * 0.10,
+    hue: GLOW_HUES[i % GLOW_HUES.length] + rand() * 12 - 6,
+    speed: 0.5 + rand() * 0.6,
+    phase: rand() * Math.PI * 2,
+    opacity: 0.18 + rand() * 0.14,
+    wanderX: 0.06 + rand() * 0.10,
+    wanderY: 0.06 + rand() * 0.12,
   };
 }
 
@@ -157,7 +185,7 @@ function drawCurtain(
 ) {
   const baseYpx = c.baseY * h;
   const thicknessPx = c.thickness * h;
-  const steps = 120;
+  const steps = 90;
 
   // Build ribbon polygon: top edge + bottom edge
   const topEdge: { x: number; y: number }[] = [];
@@ -201,7 +229,7 @@ function drawCurtain(
   ctx.clip();
   ctx.globalCompositeOperation = 'lighter';
 
-  const stripes = 200;
+  const stripes = 120;
   for (let s = 0; s < stripes; s++) {
     const u = s / (stripes - 1);
     const x = u * w;
@@ -236,7 +264,6 @@ export function LetterParticles() {
   const glowBlobs = useRef<AuroraGlow[]>([]);
   const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const animRef = useRef(0);
-  const startTime = useRef(performance.now());
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -251,7 +278,7 @@ export function LetterParticles() {
     glowCanvasRef.current = glowCanvas;
 
     function resize() {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.min(1.5, window.devicePixelRatio || 1);
       const w = Math.floor(window.innerWidth * dpr);
       const h = Math.floor(window.innerHeight * dpr);
       canvas!.width = w;
@@ -269,18 +296,32 @@ export function LetterParticles() {
     window.addEventListener('resize', resize);
 
     // Seed
+    const rand = mulberry32(hashSeed('velotype-lobby-background'));
     particles.current = Array.from({ length: PARTICLE_COUNT }, () =>
-      createParticle(window.innerWidth, window.innerHeight, true),
+      createParticle(window.innerWidth, window.innerHeight, rand, true),
     );
-    curtains.current = Array.from({ length: AURORA_COUNT }, (_, i) => createAuroraCurtain(i));
-    glowBlobs.current = Array.from({ length: GLOW_COUNT }, (_, i) => createAuroraGlow(i));
+    curtains.current = Array.from({ length: AURORA_COUNT }, (_, i) => createAuroraCurtain(i, rand));
+    glowBlobs.current = Array.from({ length: GLOW_COUNT }, (_, i) => createAuroraGlow(i, rand));
 
     let frame = 0;
+    let lastFrameTime = 0;
+    const frameIntervalMs = 1000 / 30;
 
-    function draw() {
+    function draw(now: number) {
+      if (document.hidden) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      if (now - lastFrameTime < frameIntervalMs) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      lastFrameTime = now;
+
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const t = (performance.now() - startTime.current) / 1000;
+      const t = (performance.now() - GLOBAL_ANIMATION_START) / 1000;
 
       // Clear main canvas
       ctx!.clearRect(0, 0, w, h);
@@ -332,12 +373,12 @@ export function LetterParticles() {
       ctx!.save();
       ctx!.globalCompositeOperation = 'lighter';
 
-      ctx!.globalAlpha = 0.6;
-      ctx!.filter = 'blur(70px)';
+      ctx!.globalAlpha = 0.5;
+      ctx!.filter = 'blur(50px)';
       ctx!.drawImage(glowCanvas, 0, 0, w, h);
 
-      ctx!.globalAlpha = 0.35;
-      ctx!.filter = 'blur(30px)';
+      ctx!.globalAlpha = 0.25;
+      ctx!.filter = 'blur(22px)';
       ctx!.drawImage(glowCanvas, 0, 0, w, h);
 
       ctx!.restore();
@@ -356,7 +397,7 @@ export function LetterParticles() {
         p.x += p.drift + Math.sin(frame * 0.005 + p.phase) * 0.15;
 
         if (p.y < -30 || p.x < -30 || p.x > w + 30) {
-          Object.assign(p, createParticle(w, h, false));
+          Object.assign(p, createParticle(w, h, rand, false));
         }
 
         ctx!.globalAlpha = p.opacity;

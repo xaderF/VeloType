@@ -133,9 +133,11 @@ function SelectRow({
 export interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  showFps: boolean;
+  onShowFpsChange: (value: boolean) => void;
 }
 
-export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
+export function SettingsPanel({ isOpen, onClose, showFps, onShowFpsChange }: SettingsPanelProps) {
   // All placeholder state — none persisted or functional yet
   const [masterVolume, setMasterVolume] = useState(80);
   const [sfxVolume, setSfxVolume] = useState(70);
@@ -228,6 +230,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <SettingsSection title="HUD &amp; Display">
                 <ToggleRow label="Show Live WPM" value={showLiveWpm} onChange={setShowLiveWpm} />
                 <ToggleRow label="Show Accuracy" value={showAccuracy} onChange={setShowAccuracy} />
+                <ToggleRow label="Show FPS" value={showFps} onChange={onShowFpsChange} />
               </SettingsSection>
 
               {/* Graphics */}
@@ -245,7 +248,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               {/* Placeholder notice */}
               <div className="text-center pt-2 pb-1">
                 <p className="text-xs text-lobby-text-muted/50 italic">
-                  Settings are placeholders — functionality coming soon.
+                  Some settings are placeholders. FPS toggle is functional.
                 </p>
               </div>
             </div>

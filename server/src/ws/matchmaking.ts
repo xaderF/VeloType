@@ -1,21 +1,27 @@
 import { randomUUID } from 'crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyBaseLogger } from 'fastify';
 import { WebSocket } from 'ws';
 import type { RawData } from 'ws';
 import { prisma } from '../db.js';
 import { verifyAuthToken } from '../auth.js';
 import { activeMatchConfigs } from './live-match.js';
+import { calculatePlacementProgressRating, type PlacementGameResult } from '../placement.js';
+
+// Module-level logger — initialised when the plugin registers
+let log: FastifyBaseLogger;
 
 type QueueEntry = {
   userId: string;
   username: string;
-  rating: number | null;
+  rating: number | null; // public/display rating (null = unranked)
+  matchmakingRating: number; // always numeric; includes provisional placement estimate
   joinedAt: number;
   socket: WebSocket;
 };
 
 const queue: QueueEntry[] = [];
 const MATCH_INTERVAL_MS = 1000;
+const MIN_QUEUE_WAIT_MS = 5000;
 let matcherInterval: ReturnType<typeof setInterval> | null = null;
 
 // ---------------------------------------------------------------------------
@@ -40,6 +46,44 @@ const RANK_ELO_STEP = 100;
 const RANK_CAP = 700; // max matchmaking range (7 tiers * 100 elo)
 const TOP_PARAGON = 500;
 const TOP_APEX = 1500;
+const PROVISIONAL_PLACEMENT_MMR = 1050;
+
+async function loadPlacementHistory(userId: string, take: number): Promise<PlacementGameResult[]> {
+  if (!prisma || take <= 0) return [];
+
+  const rows = await prisma.matchPlayer.findMany({
+    where: {
+      userId,
+      wpm: { not: null },
+      result: { in: ['win', 'loss'] },
+    },
+    orderBy: { createdAt: 'desc' },
+    take,
+    include: {
+      match: {
+        include: {
+          players: {
+            where: { userId: { not: userId } },
+            include: {
+              user: { include: { rating: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return rows.reverse().map((mp) => {
+    const opponent = mp.match.players[0];
+    return {
+      wpm: mp.wpm ?? 0,
+      accuracy: mp.accuracy ?? 0,
+      consistency: mp.consistency ?? 0,
+      won: mp.result === 'win',
+      opponentRating: opponent?.user?.rating?.rating ?? null,
+    };
+  });
+}
 
 /** Number of MMR-based ranks (Iron through Velocity, each with 3 tiers). */
 const MMR_BASED_RANK_COUNT = 7; // Iron=0, Bronze=1, Silver=2, Gold=3, Platinum=4, Diamond=5, Velocity=6
@@ -91,9 +135,10 @@ function tryMatchOnce() {
 
   for (let i = 0; i < queue.length; i += 1) {
     const a = queue[i];
+    if (Date.now() - a.joinedAt < MIN_QUEUE_WAIT_MS) continue;
     const range = calculateRange(a.joinedAt);
     // Unranked players use a default MMR for matchmaking purposes
-    const aRating = a.rating ?? 300;
+    const aRating = a.matchmakingRating;
     const aRankInfo = getRankInfo(aRating);
     // Find closest opponent within allowed matchmaking rules
     let candidateIndex = -1;
@@ -101,7 +146,8 @@ function tryMatchOnce() {
 
     for (let j = i + 1; j < queue.length; j += 1) {
       const b = queue[j];
-      const bRating = b.rating ?? 300;
+      if (Date.now() - b.joinedAt < MIN_QUEUE_WAIT_MS) continue;
+      const bRating = b.matchmakingRating;
       const delta = Math.abs(aRating - bRating);
       const bRankInfo = getRankInfo(bRating);
 
@@ -166,13 +212,19 @@ function stopMatcher() {
 async function createMatch(a: QueueEntry, b: QueueEntry) {
   const matchId = randomUUID();
   const seed = randomUUID();
-  const startAt = Date.now() + 5000; // 5s delay to sync clients (countdown)
+  const PREP_SECONDS = 11; // 5s loading + 3s quiet hold + 3s visible countdown
+  const COUNTDOWN_SECONDS = 3; // final 3s use countdown overlay
+  const startAt = Date.now() + PREP_SECONDS * 1000;
   const config = {
     mode: 'time' as const,
     limit: 30,
     difficulty: 'medium' as const,
     length: 240,
     includePunctuation: false,
+    maxRounds: 15,
+    prepSeconds: PREP_SECONDS,
+    countdownSeconds: COUNTDOWN_SECONDS,
+    breakSeconds: 7,
   };
 
   // Register in live-match active configs so the server can validate results
@@ -186,6 +238,14 @@ async function createMatch(a: QueueEntry, b: QueueEntry) {
     textLength: config.length,
     includePunctuation: config.includePunctuation,
     startAt,
+    maxRounds: config.maxRounds,
+    prepSeconds: config.prepSeconds,
+    countdownSeconds: config.countdownSeconds,
+    breakSeconds: config.breakSeconds,
+    playerRatings: {
+      [a.userId]: a.matchmakingRating,
+      [b.userId]: b.matchmakingRating,
+    },
   });
 
   const payload = {
@@ -227,12 +287,13 @@ async function createMatch(a: QueueEntry, b: QueueEntry) {
       });
     } catch (err) {
       // Log and continue; matchmaking should still proceed.
-      console.error('Failed to persist match', err);
+      log.error({ err, matchId }, 'Failed to persist match');
     }
   }
 }
 
 export async function matchmakingWs(app: FastifyInstance) {
+  log = app.log;
   startMatcher();
 
   app.addHook('onClose', async () => {
@@ -270,6 +331,7 @@ export async function matchmakingWs(app: FastifyInstance) {
         void (async () => {
           let username = authUser.username;
           let rating: number | null = null;
+          let matchmakingRating = PROVISIONAL_PLACEMENT_MMR;
 
           if (prisma) {
             const user = await prisma.user.findUnique({
@@ -283,13 +345,28 @@ export async function matchmakingWs(app: FastifyInstance) {
 
             username = user.username;
             rating = user.rating?.rating ?? null;
+            if (rating != null) {
+              matchmakingRating = rating;
+            } else {
+              const gamesPlayed = Math.max(0, user.rating?.placementGamesPlayed ?? 0);
+              const history = await loadPlacementHistory(authUser.id, gamesPlayed);
+              matchmakingRating = calculatePlacementProgressRating(history, PROVISIONAL_PLACEMENT_MMR);
+            }
             // competitiveElo is available via user.rating?.competitiveElo ?? null
           } else if (typeof joinMsg.rating === 'number' && Number.isFinite(joinMsg.rating)) {
             rating = Math.round(joinMsg.rating);
+            matchmakingRating = rating;
           }
 
           removeFromQueue(socket);
-          queue.push({ userId: authUser.id, username, rating, joinedAt: Date.now(), socket });
+          queue.push({
+            userId: authUser.id,
+            username,
+            rating,
+            matchmakingRating,
+            joinedAt: Date.now(),
+            socket,
+          });
           socket.send(JSON.stringify({ type: 'queued', rating, userId: authUser.id, username }));
 
           // Trigger immediate match attempt
@@ -298,7 +375,7 @@ export async function matchmakingWs(app: FastifyInstance) {
             matched = tryMatchOnce();
           } while (matched);
         })().catch((err) => {
-          console.error('matchmaking join error', err);
+          log.error({ err }, 'matchmaking join error');
           socket.send(JSON.stringify({ type: 'error', message: 'internal error' }));
         });
         return;

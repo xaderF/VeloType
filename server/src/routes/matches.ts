@@ -37,9 +37,17 @@ export async function matchRoutes(app: FastifyInstance) {
 
     const { limit, offset } = parsedQuery.data;
 
-    const total = await db.matchPlayer.count({ where: { userId: authUser.id } });
+    const total = await db.matchPlayer.count({
+      where: {
+        userId: authUser.id,
+        result: { not: null },
+      },
+    });
     const rows = await db.matchPlayer.findMany({
-      where: { userId: authUser.id },
+      where: {
+        userId: authUser.id,
+        result: { not: null },
+      },
       include: {
         match: {
           include: {

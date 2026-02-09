@@ -253,7 +253,7 @@ export function HomeScreen({
         </motion.div>
 
         {/* Mid-right: Last match */}
-        {lastMatch && (
+        {lastMatch && (lastMatch.wpm > 0 || lastMatch.accuracy > 0 || lastMatch.result !== 'draw') && (
           <motion.div
             className="text-right space-y-0.5"
             initial={{ opacity: 0, x: 12 }}
