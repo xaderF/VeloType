@@ -7,14 +7,11 @@
   <img alt="Vite" height="24" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" />
 </p>
 
-VeloXType is a competitive typing game that transforms typing speed, accuracy, and consistency into structured, skill-based competition.  
-The project is designed around ranked progression, fair match conditions, and extensible game modes rather than traditional standalone typing tests.
-
----
-
 ## Overview
 
-VeloXType is built as a modern, **type-safe** web application to explore competitive typing mechanics beyond conventional typing platforms. Instead of measuring raw speed in isolation, the game evaluates relative performance between players, emphasizing accuracy, consistency, and decision-making under pressure.
+VeloXType is a competitive typing game that transforms typing speed, accuracy, and consistency into structured, skill-based competition. Built as a modern, **type-safe** web application, the project is designed around ranked progression, fair match conditions, and extensible game modes rather than traditional standalone typing tests.
+
+Instead of measuring raw speed in isolation, VeloXType evaluates relative performance between players, emphasizing accuracy, consistency, and decision-making under pressure.
 
 The codebase is intentionally structured to support scalable game modes and future real-time features while maintaining clean component boundaries and predictable, strongly-typed game logic.
 
@@ -186,4 +183,3 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] Accessibility and UX refinements
 - [x] Performance profiling and optimization
 - [x] Legal and privacy documentation
-
