@@ -25,6 +25,7 @@ function asProvider(raw: string): OAuthProvider | null {
 
 async function verifyGoogle(input: VerifyOAuthInput): Promise<VerifiedOAuthIdentity | null> {
   if (!input.idToken) return null;
+  if (!env.OAUTH_GOOGLE_CLIENT_ID) return null;
 
   const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(input.idToken)}`);
   if (!res.ok) return null;
@@ -40,8 +41,8 @@ async function verifyGoogle(input: VerifyOAuthInput): Promise<VerifiedOAuthIdent
 
   const verified = data.email_verified === true || data.email_verified === 'true';
   if (!data.sub || !data.email || !verified) return null;
-  // Require app audience match when configured (always enforced in production by env validation).
-  if (env.OAUTH_GOOGLE_CLIENT_ID && data.aud !== env.OAUTH_GOOGLE_CLIENT_ID) return null;
+  // Require app audience match for this backend's Google OAuth client.
+  if (data.aud !== env.OAUTH_GOOGLE_CLIENT_ID) return null;
 
   return {
     provider: 'google',

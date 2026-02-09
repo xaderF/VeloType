@@ -48,8 +48,4 @@ if (parsedEnv.NODE_ENV === 'production' && !parsedEnv.CORS_ORIGIN) {
   throw new Error('FATAL: CORS_ORIGIN must be set in production');
 }
 
-if (parsedEnv.NODE_ENV === 'production' && !parsedEnv.OAUTH_GOOGLE_CLIENT_ID) {
-  throw new Error('FATAL: OAUTH_GOOGLE_CLIENT_ID must be set in production when Google OAuth is enabled');
-}
-
 export const env: Env = parsedEnv;

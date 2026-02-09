@@ -15,7 +15,7 @@ npm install
   - `DATABASE_URL` (Postgres)
   - `AUTH_SECRET` (required, min 32 chars)
   - `CORS_ORIGIN` (required in production; comma-separated allowed origins)
-  - `OAUTH_GOOGLE_CLIENT_ID` (required in production if Google OAuth is enabled)
+  - `OAUTH_GOOGLE_CLIENT_ID` (optional; required only if using Google OAuth login)
   - `DAILY_RESET_TIMEZONE` (IANA tz for daily challenge rollover, default `America/New_York`)
 
 3) Run
