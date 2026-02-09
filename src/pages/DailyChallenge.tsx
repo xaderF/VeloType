@@ -17,6 +17,8 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 interface DailyInfo {
   date: string;
+  nextResetAt: string;
+  resetTimezone: string;
   seed: string;
   targetText: string;
   alreadyPlayed: boolean;
@@ -45,6 +47,24 @@ interface SubmitResult {
   rank: number;
 }
 
+function formatResetCountdown(nextResetAt: string | undefined, nowMs: number): string {
+  if (!nextResetAt) return '--:--:--';
+  const targetMs = Date.parse(nextResetAt);
+  if (!Number.isFinite(targetMs)) return '--:--:--';
+
+  const diffSeconds = Math.max(0, Math.floor((targetMs - nowMs) / 1000));
+  const hours = Math.floor(diffSeconds / 3600);
+  const minutes = Math.floor((diffSeconds % 3600) / 60);
+  const seconds = diffSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatResetTimezoneLabel(timezone: string | undefined): string {
+  if (!timezone) return 'ET';
+  return timezone === 'America/New_York' ? 'ET' : timezone;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -62,6 +82,7 @@ export default function DailyChallenge() {
   const [startTime, setStartTime] = useState(0);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Keystroke-level error tracking (same as typing engine)
@@ -98,6 +119,27 @@ export default function DailyChallenge() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Refresh as soon as the server-defined daily boundary passes.
+  useEffect(() => {
+    if (!daily?.nextResetAt) return;
+    if (phase === 'playing') return;
+
+    const nextResetMs = Date.parse(daily.nextResetAt);
+    if (!Number.isFinite(nextResetMs)) return;
+
+    const delayMs = Math.max(1000, nextResetMs - Date.now() + 1000);
+    const timer = window.setTimeout(() => {
+      void fetchData();
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [daily?.nextResetAt, fetchData, phase]);
 
   // Handle submission
   const finishChallenge = useCallback(async (finalTyped?: string) => {
@@ -205,7 +247,12 @@ export default function DailyChallenge() {
             ← Home
           </Link>
           <h1 className="text-lg font-bold">Daily Challenge</h1>
-          <span className="text-sm text-muted-foreground font-mono">{daily?.date}</span>
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground font-mono">{daily?.date}</div>
+            <div className="text-xs text-muted-foreground font-mono">
+              resets in {formatResetCountdown(daily?.nextResetAt, nowMs)} {formatResetTimezoneLabel(daily?.resetTimezone)}
+            </div>
+          </div>
         </div>
 
         {/* Challenge area */}

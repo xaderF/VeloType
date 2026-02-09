@@ -16,9 +16,28 @@ export interface MatchFoundPayload {
     difficulty: string;
     length: number;
     includePunctuation: boolean;
+    maxRounds?: number;
+    prepSeconds?: number;
+    countdownSeconds?: number;
+    breakSeconds?: number;
   };
   startAt: number;
-  opponents: Record<string, { username: string; rating: number }>;
+  opponents: Record<string, { username: string; rating: number | null }>;
+}
+
+export interface JoinedConfigPayload {
+  seed: string;
+  mode: string;
+  limit: number;
+  difficulty: string;
+  textLength: number;
+  includePunctuation: boolean;
+  startAt: number;
+  roundNumber?: number;
+  maxRounds?: number;
+  breakSeconds?: number;
+  countdownSeconds?: number;
+  prepSeconds?: number;
 }
 
 export interface OpponentProgressPayload {
@@ -37,6 +56,32 @@ export interface OpponentFinishedPayload {
   userId: string;
 }
 
+export interface RoundEndPlayerPayload {
+  wpm: number;
+  accuracy: number;
+  consistency: number;
+  score: number;
+  correctChars: number;
+  totalTyped: number;
+  errors: number;
+  rawWpm: number;
+  damageDealt: number;
+  damageTaken: number;
+  hp: number;
+}
+
+export interface RoundEndPayload {
+  type: 'round_end';
+  matchId: string;
+  roundNumber: number;
+  maxRounds: number;
+  winner: string;
+  players: Record<string, RoundEndPlayerPayload>;
+  breakSeconds: number;
+  countdownSeconds: number;
+  nextRoundStartAt: number | null;
+}
+
 export interface MatchCompletePlayer {
   wpm: number;
   accuracy: number;
@@ -49,6 +94,9 @@ export interface MatchCompletePlayer {
   result: string;
   damageDealt: number;
   damageTaken: number;
+  ratingDelta?: number;
+  newRating?: number | null;
+  competitiveElo?: number | null;
 }
 
 export interface MatchCompletePayload {
@@ -68,6 +116,10 @@ export interface MatchStateRecoveryPayload {
     elapsedMs: number;
   }>;
   opponentFinished: string[];
+  roundNumber?: number;
+  roundStartAt?: number;
+  maxRounds?: number;
+  hp?: Record<string, number>;
 }
 
 export interface PongPayload {
@@ -78,15 +130,16 @@ export interface PongPayload {
 
 export type ServerMessage =
   | { type: 'welcome'; message: string }
-  | { type: 'queued'; rating: number; userId: string; username: string }
+  | { type: 'queued'; rating: number | null; userId: string; username: string }
   | { type: 'left' }
   | MatchFoundPayload
-  | { type: 'joined'; matchId: string; userId: string; config: MatchFoundPayload['config'] & { startAt: number; seed: string } | null }
+  | { type: 'joined'; matchId: string; userId: string; config: JoinedConfigPayload | null }
   | { type: 'opponent_joined'; matchId: string; userId: string }
   | { type: 'opponent_left'; matchId: string; userId: string }
   | OpponentProgressPayload
   | OpponentFinishedPayload
   | { type: 'result_received'; matchId: string }
+  | RoundEndPayload
   | MatchCompletePayload
   | MatchStateRecoveryPayload
   | PongPayload
@@ -97,13 +150,9 @@ export type ServerMessage =
 // ---------------------------------------------------------------------------
 
 export interface LatencyStats {
-  /** Current round-trip time in ms */
   rtt: number;
-  /** Smoothed RTT (exponential moving average) */
   smoothedRtt: number;
-  /** Jitter (mean deviation of RTT) */
   jitter: number;
-  /** Clock offset estimate: serverTime - clientTime (ms) */
   clockOffset: number;
 }
 
@@ -115,23 +164,18 @@ export class LatencyTracker {
   private clockOffset = 0;
   private lastRtt = 0;
 
-  /** Record a ping/pong round-trip measurement */
   record(clientSendTs: number, clientRecvTs: number, serverTs: number) {
     const rtt = clientRecvTs - clientSendTs;
-    if (rtt < 0 || rtt > 10_000) return; // discard implausible values
+    if (rtt < 0 || rtt > 10_000) return;
 
-    // Clock offset: server time at midpoint minus client midpoint
     const halfRtt = rtt / 2;
     const offset = serverTs - (clientSendTs + halfRtt);
 
     this.samples.push({ rtt, clockOffset: offset });
-    if (this.samples.length > this.maxSamples) {
-      this.samples.shift();
-    }
+    if (this.samples.length > this.maxSamples) this.samples.shift();
 
     this.lastRtt = rtt;
 
-    // Smoothed RTT: EWMA with α = 0.125 (like TCP)
     if (this.smoothedRtt === 0) {
       this.smoothedRtt = rtt;
       this.jitter = rtt / 2;
@@ -140,12 +184,10 @@ export class LatencyTracker {
       this.jitter = 0.75 * this.jitter + 0.25 * Math.abs(rtt - this.smoothedRtt);
     }
 
-    // Clock offset: median of recent samples for robustness
     const offsets = this.samples.map((s) => s.clockOffset).sort((a, b) => a - b);
     this.clockOffset = offsets[Math.floor(offsets.length / 2)];
   }
 
-  /** Get current latency statistics */
   getStats(): LatencyStats {
     return {
       rtt: this.lastRtt,
@@ -155,14 +197,11 @@ export class LatencyTracker {
     };
   }
 
-  /** Convert a server timestamp to estimated client time */
   serverToClientTime(serverTs: number): number {
     return serverTs - this.clockOffset;
   }
 
-  /** Compensate elapsed time reported by opponent for network jitter */
   compensateElapsed(reportedElapsedMs: number): number {
-    // Subtract half RTT (one-way latency) to estimate true elapsed
     const oneWay = this.smoothedRtt / 2;
     return Math.max(0, reportedElapsedMs - oneWay);
   }
@@ -181,7 +220,7 @@ export class LatencyTracker {
 // ---------------------------------------------------------------------------
 
 export function createMatchmakingSocket(handlers: {
-  onQueued?: (data: { rating: number; userId: string; username: string }) => void;
+  onQueued?: (data: { rating: number | null; userId: string; username: string }) => void;
   onMatchFound?: (data: MatchFoundPayload) => void;
   onError?: (msg: string) => void;
   onClose?: () => void;
@@ -202,7 +241,9 @@ export function createMatchmakingSocket(handlers: {
           handlers.onError?.(msg.message);
           break;
       }
-    } catch { /* ignore parse errors */ }
+    } catch {
+      // Ignore parse errors
+    }
   };
 
   ws.onclose = () => handlers.onClose?.();
@@ -235,12 +276,13 @@ export function createMatchmakingSocket(handlers: {
 // ---------------------------------------------------------------------------
 
 export interface LiveMatchSocketHandlers {
-  onJoined?: (data: { matchId: string; userId: string; config: unknown }) => void;
+  onJoined?: (data: { matchId: string; userId: string; config: JoinedConfigPayload | null }) => void;
   onOpponentJoined?: (data: { matchId: string; userId: string }) => void;
   onOpponentLeft?: (data: { matchId: string; userId: string }) => void;
   onOpponentProgress?: (data: OpponentProgressPayload) => void;
   onOpponentFinished?: (data: OpponentFinishedPayload) => void;
   onResultReceived?: (data: { matchId: string }) => void;
+  onRoundEnd?: (data: RoundEndPayload) => void;
   onMatchComplete?: (data: MatchCompletePayload) => void;
   onMatchStateRecovery?: (data: MatchStateRecoveryPayload) => void;
   onLatencyUpdate?: (stats: LatencyStats) => void;
@@ -251,24 +293,42 @@ export interface LiveMatchSocketHandlers {
 }
 
 export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
-  // Reconnect state
   let reconnectAttempts = 0;
   const MAX_RECONNECT_ATTEMPTS = 10;
-  const BASE_RECONNECT_DELAY = 500;   // ms
-  const MAX_RECONNECT_DELAY = 8_000;  // ms
+  const BASE_RECONNECT_DELAY = 500;
+  const MAX_RECONNECT_DELAY = 8_000;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let intentionalClose = false;
   let currentMatchId: string | null = null;
   let currentToken: string | null = null;
   let hasJoined = false;
+  let hasJoinAck = false;
 
-  // Latency tracking
   const latencyTracker = new LatencyTracker();
   let pingInterval: ReturnType<typeof setInterval> | null = null;
   const PING_INTERVAL_MS = 3_000;
 
-  // Current WebSocket
   let ws: WebSocket;
+
+  function stopPing() {
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
+  }
+
+  function startPing() {
+    stopPing();
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping', clientTs: Date.now() }));
+      }
+    }, PING_INTERVAL_MS);
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping', clientTs: Date.now() }));
+    }
+  }
 
   function setupWs(): WebSocket {
     const sock = new WebSocket(`${WS_BASE}/ws/match`);
@@ -278,6 +338,7 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
         const msg = JSON.parse(event.data as string) as ServerMessage;
         switch (msg.type) {
           case 'joined':
+            hasJoinAck = true;
             handlers.onJoined?.(msg);
             break;
           case 'opponent_joined':
@@ -295,6 +356,9 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
           case 'result_received':
             handlers.onResultReceived?.(msg);
             break;
+          case 'round_end':
+            handlers.onRoundEnd?.(msg);
+            break;
           case 'match_complete':
             handlers.onMatchComplete?.(msg);
             break;
@@ -309,16 +373,19 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
             handlers.onError?.(msg.message);
             break;
         }
-      } catch { /* ignore parse errors */ }
+      } catch {
+        // Ignore parse errors
+      }
     };
 
     sock.onclose = () => {
       stopPing();
+      hasJoinAck = false;
       if (intentionalClose) {
         handlers.onClose?.();
         return;
       }
-      // Auto-reconnect if we were in a match
+
       if (hasJoined && currentMatchId && currentToken) {
         attemptReconnect();
       } else {
@@ -340,7 +407,7 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
       return;
     }
 
-    reconnectAttempts++;
+    reconnectAttempts += 1;
     const delay = Math.min(
       BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1) + Math.random() * 200,
       MAX_RECONNECT_DELAY,
@@ -352,7 +419,6 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
       reconnectTimer = null;
       ws = setupWs();
 
-      // Re-join when the socket opens
       ws.addEventListener('open', () => {
         if (currentMatchId && currentToken) {
           ws.send(JSON.stringify({ type: 'join', matchId: currentMatchId, token: currentToken }));
@@ -364,39 +430,19 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
     }, delay);
   }
 
-  // Ping/pong for latency measurement
-  function startPing() {
-    stopPing();
-    pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'ping', clientTs: Date.now() }));
-      }
-    }, PING_INTERVAL_MS);
-    // Send initial ping immediately
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'ping', clientTs: Date.now() }));
-    }
-  }
-
-  function stopPing() {
-    if (pingInterval) {
-      clearInterval(pingInterval);
-      pingInterval = null;
-    }
-  }
-
-  // Initialize
   ws = setupWs();
 
   function join(matchId: string, token: string) {
     currentMatchId = matchId;
     currentToken = token;
     hasJoined = true;
+    hasJoinAck = false;
 
     const doSend = () => {
       ws.send(JSON.stringify({ type: 'join', matchId, token }));
       startPing();
     };
+
     if (ws.readyState === WebSocket.OPEN) {
       doSend();
     } else {
@@ -410,7 +456,7 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
     mistakesCount: number,
     elapsedMs: number,
   ) {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (ws.readyState === WebSocket.OPEN && hasJoinAck) {
       ws.send(JSON.stringify({
         type: 'progress',
         progressIndex,
@@ -422,13 +468,22 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
   }
 
   function sendResult(typed: string, samples: number[], totalErrors?: number, totalKeystrokes?: number) {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (ws.readyState === WebSocket.OPEN && hasJoinAck) {
       ws.send(JSON.stringify({ type: 'result', typed, samples, totalErrors, totalKeystrokes }));
     }
   }
 
+  function sendForfeit(): boolean {
+    if (ws.readyState === WebSocket.OPEN && hasJoinAck) {
+      ws.send(JSON.stringify({ type: 'forfeit' }));
+      return true;
+    }
+    return false;
+  }
+
   function close() {
     intentionalClose = true;
+    hasJoinAck = false;
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -445,5 +500,19 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
     return latencyTracker;
   }
 
-  return { get ws() { return ws; }, join, sendProgress, sendResult, close, getLatency, getLatencyTracker };
+  function isReadyForMatchEvents(): boolean {
+    return hasJoinAck;
+  }
+
+  return {
+    get ws() { return ws; },
+    join,
+    sendProgress,
+    sendResult,
+    sendForfeit,
+    close,
+    getLatency,
+    getLatencyTracker,
+    isReadyForMatchEvents,
+  };
 }

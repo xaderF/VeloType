@@ -1,10 +1,23 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CircleHelp, Gauge, Swords, Target, Timer } from 'lucide-react';
+import {
+  CircleHelp,
+  Crown,
+  Flame,
+  Gauge,
+  Gem,
+  Medal,
+  Shield,
+  Swords,
+  Target,
+  Timer,
+  Trophy,
+  Zap,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { RankBadge } from '@/components/game-ui/RankBadge';
-import { getRankWithLeaderboard, getRankTier, PLACEMENT_GAMES_REQUIRED } from '@/utils/scoring';
+import { LobbyPageShell } from '@/components/layout/LobbyPageShell';
+import { getRankWithLeaderboard, getRankTier, getTierProgress, PLACEMENT_GAMES_REQUIRED, type Rank } from '@/utils/scoring';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +51,8 @@ interface MatchEntry {
     score: number | null;
     result: string | null;
     damageDealt: number | null;
+    ratingBefore: number | null;
+    ratingAfter: number | null;
     ratingDelta: number | null;
   };
   opponent: {
@@ -70,22 +85,22 @@ export default function Profile() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <LobbyPageShell contentClassName="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <p className="text-muted-foreground">You need to be logged in to view your career.</p>
           <Link to="/" className="text-primary underline">
             Go Home
           </Link>
         </div>
-      </div>
+      </LobbyPageShell>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <LobbyPageShell contentClassName="min-h-screen flex items-center justify-center p-4">
         <div className="text-muted-foreground animate-pulse">Loading career...</div>
-      </div>
+      </LobbyPageShell>
     );
   }
 
@@ -99,9 +114,11 @@ export default function Profile() {
   const rankInfo = rating != null ? getRankWithLeaderboard(rating) : null;
   const rankTier = rating != null && rankInfo ? getRankTier(rating, rankInfo.rank) : 0;
   const rankLabel = rankInfo ? `${rankInfo.name}${rankTier > 0 ? ` ${rankTier}` : ''}` : 'Unranked';
+  const tierProgress = rating != null ? getTierProgress(rating) : 0;
+  const isLeaderboardRank = rankInfo?.rank === 'apex' || rankInfo?.rank === 'paragon';
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <LobbyPageShell contentClassName="p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -148,16 +165,21 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-border/70 bg-background/40 p-6">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                    <div className="flex items-center gap-4">
-                      <RankBadge rating={rating} size="md" />
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">{user?.username}</p>
-                        <h1 className="text-2xl font-bold">{rankLabel}</h1>
-                        <p className="text-sm text-muted-foreground">Hidden MMR: {rating}</p>
+                  <div className="flex flex-col items-center text-center gap-4">
+                    {rankInfo && <RankEmblem rank={rankInfo.rank} className={rankInfo.color} />}
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{user?.username}</p>
+                      <h1 className="text-4xl font-bold tracking-wide uppercase">{rankLabel}</h1>
+                    </div>
+                    <div className="w-full max-w-md space-y-2 pt-1">
+                      <Progress value={isLeaderboardRank ? 100 : tierProgress} className="h-2" />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{isLeaderboardRank ? 'Competitive rating' : 'Rank rating'}</span>
+                        <span>{isLeaderboardRank ? 'Top tier' : `${tierProgress}/100`}</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <p className="text-sm text-muted-foreground">Hidden MMR: {rating}</p>
+                    <div className="flex flex-wrap justify-center gap-2 text-xs pt-1">
                       <Badge variant="secondary" className="justify-center">Ranked Active</Badge>
                       <Badge variant="outline" className="justify-center">Placement Complete</Badge>
                     </div>
@@ -199,7 +221,7 @@ export default function Profile() {
           </Card>
         </motion.div>
       </div>
-    </div>
+    </LobbyPageShell>
   );
 }
 
@@ -230,10 +252,47 @@ function StatCard({
   );
 }
 
+const RANK_ICON_MAP: Record<Rank, typeof Shield> = {
+  iron: Shield,
+  bronze: Shield,
+  silver: Shield,
+  gold: Medal,
+  platinum: Gem,
+  diamond: Gem,
+  velocity: Zap,
+  apex: Flame,
+  paragon: Crown,
+};
+
+function RankEmblem({ rank, className }: { rank: Rank; className?: string }) {
+  const Icon = RANK_ICON_MAP[rank] ?? Trophy;
+
+  return (
+    <div className="relative">
+      <div
+        className={cn(
+          'relative w-24 h-24 rounded-2xl border border-white/20 flex items-center justify-center text-primary-foreground',
+          className,
+        )}
+      >
+        <div className="absolute inset-2 rounded-xl border border-white/20" />
+        <Icon className="relative z-10 w-9 h-9" />
+      </div>
+    </div>
+  );
+}
+
 function MatchRow({ match }: { match: MatchEntry }) {
   const result = match.you.result;
   const opponentName = match.opponent?.username ?? 'Unknown';
   const date = new Date(match.createdAt);
+  const isPlacementGame = match.you.ratingBefore == null;
+  const delta = resolveDisplayRatingDelta(
+    match.you.ratingDelta,
+    match.you.ratingBefore,
+    match.you.ratingAfter,
+    result,
+  );
 
   const resultLabel = result === 'win' ? 'VICTORY' : result === 'loss' ? 'DEFEAT' : 'DRAW';
   const resultTone = result === 'win'
@@ -252,52 +311,45 @@ function MatchRow({ match }: { match: MatchEntry }) {
       <div className={cn('rounded-lg border p-3 transition-colors hover:bg-secondary/60', resultTone)}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-sm font-semibold uppercase">
-              {opponentName.slice(0, 1)}
-            </div>
+            <p className={cn('text-sm font-semibold tracking-wide min-w-[4.8rem]', resultTextTone)}>{resultLabel}</p>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">vs {opponentName}</p>
               <p className="text-xs text-muted-foreground truncate">
                 {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                {' • '}
-                {match.limit}s {match.mode}
               </p>
             </div>
           </div>
 
           <div className="text-right">
-            <p className={cn('text-sm font-semibold tracking-wide', resultTextTone)}>{resultLabel}</p>
-            {match.you.ratingDelta != null && (
+            {isPlacementGame ? (
+              <p className="text-sm font-mono font-semibold text-primary">PLACEMENT +1</p>
+            ) : (
               <p className={cn(
-                'text-xs font-mono',
-                match.you.ratingDelta > 0 && 'text-emerald-300',
-                match.you.ratingDelta < 0 && 'text-rose-300',
-                match.you.ratingDelta === 0 && 'text-muted-foreground',
+                'text-sm font-mono font-semibold',
+                delta > 0 && 'text-emerald-300',
+                delta < 0 && 'text-rose-300',
+                delta === 0 && 'text-muted-foreground',
               )}
               >
-                {match.you.ratingDelta > 0 ? '+' : ''}
-                {match.you.ratingDelta}
+                ELO {delta > 0 ? '+' : ''}{delta}
               </p>
             )}
           </div>
-        </div>
-
-        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-          <MetricChip label="WPM" value={match.you.wpm != null ? Math.round(match.you.wpm) : '-'} />
-          <MetricChip label="ACC" value={match.you.accuracy != null ? `${Math.round(match.you.accuracy * 100)}%` : '-'} />
-          <MetricChip label="CONS" value={match.you.consistency != null ? `${Math.round(match.you.consistency * 100)}%` : '-'} />
-          <MetricChip label="DMG" value={match.you.damageDealt != null ? Math.round(match.you.damageDealt) : '-'} />
         </div>
       </div>
     </Link>
   );
 }
 
-function MetricChip({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded bg-background/60 border border-border/60 px-2 py-1">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="ml-2 font-mono">{value}</span>
-    </div>
-  );
+function resolveDisplayRatingDelta(
+  explicitDelta: number | null,
+  ratingBefore: number | null,
+  ratingAfter: number | null,
+  result: string | null,
+) {
+  if (explicitDelta != null) return explicitDelta;
+  if (ratingBefore != null && ratingAfter != null) return ratingAfter - ratingBefore;
+  if (result === 'win') return 12;
+  if (result === 'loss') return -12;
+  return 0;
 }

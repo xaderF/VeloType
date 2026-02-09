@@ -25,16 +25,32 @@ const rankIcons: Record<Rank, string> = {
 };
 
 export function RankBadge({ rating, leaderboardPosition, competitiveElo, size = 'md', className }: RankBadgeProps) {
-  if (rating == null) return null;
-
-  const rankInfo = getRankWithLeaderboard(rating, leaderboardPosition);
-  const tierName = getRankTierName(rating, leaderboardPosition, competitiveElo);
-
   const sizeClasses = {
     sm: 'text-xs px-2 py-0.5',
     md: 'text-sm px-3 py-1',
     lg: 'text-base px-4 py-1.5',
   };
+
+  if (rating == null) {
+    return (
+      <motion.div
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full font-semibold bg-muted text-muted-foreground',
+          sizeClasses[size],
+          className,
+        )}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        whileHover={{ scale: 1.05 }}
+      >
+        <span>◌</span>
+        <span>UNRANKED</span>
+      </motion.div>
+    );
+  }
+
+  const rankInfo = getRankWithLeaderboard(rating, leaderboardPosition);
+  const tierName = getRankTierName(rating, leaderboardPosition, competitiveElo);
 
   return (
     <motion.div

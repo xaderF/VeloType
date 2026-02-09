@@ -3,13 +3,19 @@
 // Props: isVisible, player, opponent, onReady.
 import { motion, AnimatePresence } from 'framer-motion';
 import { RankBadge } from './RankBadge';
-import { Player } from '@/types/game';
 import { cn } from '@/lib/utils';
+
+interface MatchCardPlayer {
+  username: string;
+  rating: number | null | undefined;
+}
 
 interface MatchFoundOverlayProps {
   isVisible: boolean;
-  player: Player;
-  opponent: Player;
+  player: MatchCardPlayer;
+  opponent: MatchCardPlayer;
+  loadingProgress?: number;
+  loadingLabel?: string;
   onReady?: () => void;
   className?: string;
 }
@@ -18,6 +24,8 @@ export function MatchFoundOverlay({
   isVisible,
   player,
   opponent,
+  loadingProgress,
+  loadingLabel,
   onReady,
   className,
 }: MatchFoundOverlayProps) {
@@ -92,8 +100,26 @@ export function MatchFoundOverlay({
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8 }}
             >
-              Match starting soon...
+              {loadingLabel ?? 'Match starting soon...'}
             </motion.div>
+
+            {typeof loadingProgress === 'number' && (
+              <motion.div
+                className="mt-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9 }}
+              >
+                <div className="h-1.5 rounded-full bg-lobby-text-muted/20 overflow-hidden">
+                  <motion.div
+                    className="h-full bg-primary"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(0, Math.min(100, loadingProgress * 100))}%` }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                  />
+                </div>
+              </motion.div>
+            )}
           </div>
         </motion.div>
       )}

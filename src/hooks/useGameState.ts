@@ -44,7 +44,14 @@ export function useGameState({
   });
   
   const queueTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const queueMatchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const matchFoundTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const roundAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resultsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const drawConfirmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const drawResolveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const queueSessionRef = useRef(0);
 
   // Create player object (memoized to keep stable reference for hooks)
   const player: Player = useMemo(() => ({
@@ -58,6 +65,13 @@ export function useGameState({
 
   // Start queue
   const startQueue = useCallback(() => {
+    queueSessionRef.current += 1;
+    const queueSession = queueSessionRef.current;
+
+    if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+    if (queueMatchTimerRef.current) clearTimeout(queueMatchTimerRef.current);
+    if (matchFoundTimerRef.current) clearTimeout(matchFoundTimerRef.current);
+
     setPhase('queue');
     setQueueTime(0);
     
@@ -67,10 +81,12 @@ export function useGameState({
 
     // Simulate finding a match after 2-4 seconds
     const matchDelay = 2000 + Math.random() * 2000;
-    setTimeout(() => {
-      if (queueTimerRef.current) {
-        clearInterval(queueTimerRef.current);
-      }
+    queueMatchTimerRef.current = setTimeout(() => {
+      if (queueSessionRef.current !== queueSession) return;
+
+      if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+      queueTimerRef.current = null;
+      queueMatchTimerRef.current = null;
       
       // Generate opponent
       const opponentRating = playerRating + Math.floor((Math.random() - 0.5) * 200);
@@ -107,18 +123,24 @@ export function useGameState({
       setPhase('match_found');
 
       // Auto-start countdown after showing match found
-      setTimeout(() => {
+      matchFoundTimerRef.current = setTimeout(() => {
+        if (queueSessionRef.current !== queueSession) return;
         setPhase('countdown');
         setCountdown(3);
+        matchFoundTimerRef.current = null;
       }, 2500);
     }, matchDelay);
   }, [playerRating, player, practiceSettings]);
 
   // Cancel queue
   const cancelQueue = useCallback(() => {
-    if (queueTimerRef.current) {
-      clearInterval(queueTimerRef.current);
-    }
+    queueSessionRef.current += 1;
+    if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+    if (queueMatchTimerRef.current) clearTimeout(queueMatchTimerRef.current);
+    if (matchFoundTimerRef.current) clearTimeout(matchFoundTimerRef.current);
+    queueTimerRef.current = null;
+    queueMatchTimerRef.current = null;
+    matchFoundTimerRef.current = null;
     setPhase('home');
     setQueueTime(0);
   }, []);
@@ -171,16 +193,14 @@ export function useGameState({
   const handleRoundComplete = useCallback((playerStats: RoundStats) => {
     if (!match) return;
 
-    console.log('[handleRoundComplete] wpmHistory length:', playerStats.wpmHistory?.length ?? 0);
-
     setRoundStats(playerStats);
     
     // Simulate opponent stats
     const opponentStats = simulateOpponentStats(playerStats.wpm);
     
     // Calculate scores
-    const playerScore = performanceScore(playerStats);
-    const opponentScore = performanceScore(opponentStats);
+    const playerScore = performanceScore(playerStats, match.player.rating);
+    const opponentScore = performanceScore(opponentStats, match.opponent.rating);
     
     // Determine winner and damage
     let winner: 'player' | 'opponent' | 'draw' = 'draw';
@@ -246,10 +266,12 @@ export function useGameState({
     });
 
     setPhase('round_end');
+    if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
+    if (roundAdvanceTimerRef.current) clearTimeout(roundAdvanceTimerRef.current);
 
     // If match ended, calculate ELO and go to results
     if (matchEnded) {
-      setTimeout(() => {
+      resultsTimerRef.current = setTimeout(() => {
         if (matchWinner !== null) {
           const result: 'win' | 'loss' | 'draw' = matchWinner === 'draw' ? 'draw' : matchWinner === 'player' ? 'win' : 'loss';
           const eloChange = calculateEloChange(
@@ -260,13 +282,15 @@ export function useGameState({
           setPlayerRating((prev) => prev + eloChange);
         }
         setPhase('results');
+        resultsTimerRef.current = null;
       }, 3000);
     } else {
-      // 15s break between rounds, then normal countdown
-      const breakMs = 15000;
-      setTimeout(() => {
+      // 7s break between rounds, then normal countdown
+      const breakMs = 7000;
+      roundAdvanceTimerRef.current = setTimeout(() => {
         setPhase('countdown');
         setCountdown(3);
+        roundAdvanceTimerRef.current = null;
       }, breakMs);
     }
   }, [match, playerRating, simulateOpponentStats, drawAccepted]);
@@ -275,8 +299,11 @@ export function useGameState({
   const offerDraw = useCallback(() => {
     if (!match || match.currentRound < 10 || match.status === 'match_end') return;
     setDrawOffered(true);
+    if (drawConfirmTimerRef.current) clearTimeout(drawConfirmTimerRef.current);
+    if (drawResolveTimerRef.current) clearTimeout(drawResolveTimerRef.current);
+
     // Simulate opponent confirming draw shortly after
-    setTimeout(() => {
+    drawConfirmTimerRef.current = setTimeout(() => {
       setDrawAccepted(true);
       setMatch((prev) => {
         if (!prev) return null;
@@ -287,7 +314,7 @@ export function useGameState({
         };
       });
       setPhase('round_end');
-      setTimeout(() => {
+      drawResolveTimerRef.current = setTimeout(() => {
         const eloChange = calculateEloChange(
           playerRating,
           match.opponent.rating,
@@ -295,7 +322,9 @@ export function useGameState({
         );
         setPlayerRating((prev) => prev + eloChange);
         setPhase('results');
+        drawResolveTimerRef.current = null;
       }, 2000);
+      drawConfirmTimerRef.current = null;
     }, 800);
   }, [match, playerRating]);
 
@@ -322,16 +351,42 @@ export function useGameState({
 
   // Play again
   const playAgain = useCallback(() => {
+    queueSessionRef.current += 1;
+    if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+    if (queueMatchTimerRef.current) clearTimeout(queueMatchTimerRef.current);
+    if (matchFoundTimerRef.current) clearTimeout(matchFoundTimerRef.current);
+    if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+    if (roundAdvanceTimerRef.current) clearTimeout(roundAdvanceTimerRef.current);
+    if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
+    if (drawConfirmTimerRef.current) clearTimeout(drawConfirmTimerRef.current);
+    if (drawResolveTimerRef.current) clearTimeout(drawResolveTimerRef.current);
+    queueTimerRef.current = null;
+    queueMatchTimerRef.current = null;
+    matchFoundTimerRef.current = null;
+    countdownTimerRef.current = null;
+    roundAdvanceTimerRef.current = null;
+    resultsTimerRef.current = null;
+    drawConfirmTimerRef.current = null;
+    drawResolveTimerRef.current = null;
+
     setMatch(null);
     setRoundStats(null);
     setPhase('home');
+    setQueueTime(0);
+    setCountdown(3);
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+      if (queueMatchTimerRef.current) clearTimeout(queueMatchTimerRef.current);
+      if (matchFoundTimerRef.current) clearTimeout(matchFoundTimerRef.current);
       if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+      if (roundAdvanceTimerRef.current) clearTimeout(roundAdvanceTimerRef.current);
+      if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
+      if (drawConfirmTimerRef.current) clearTimeout(drawConfirmTimerRef.current);
+      if (drawResolveTimerRef.current) clearTimeout(drawResolveTimerRef.current);
     };
   }, []);
 

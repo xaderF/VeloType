@@ -7,11 +7,13 @@ import { TypingDisplay } from './TypingDisplay';
 import { useTypingEngine } from '@/hooks/useTypingEngine';
 import { RoundStats } from '@/utils/scoring';
 import { cn } from '@/lib/utils';
+import { TypingMode } from '@/game/engine';
 
 interface TypingArenaProps {
   text: string;
   isActive: boolean;
   timeLimit?: number;
+  mode?: TypingMode;
   onComplete?: (stats: RoundStats) => void;
   /** Called alongside onComplete with the raw typed string, per-second samples, and keystroke-level error tracking (for online mode) */
   onCompleteRaw?: (typed: string, samples: number[], totalErrors: number, totalKeystrokes: number) => void;
@@ -28,6 +30,7 @@ export function TypingArena({
   text,
   isActive,
   timeLimit = 30,
+  mode = 'time',
   onComplete,
   onCompleteRaw,
   onProgressUpdate,
@@ -45,6 +48,7 @@ export function TypingArena({
   } = useTypingEngine({
     text,
     isActive,
+    mode,
     onComplete,
     timeLimit,
     startOnFirstKeystroke: startOnFirstKeystrokeProp ?? focusMode,
@@ -158,7 +162,7 @@ export function TypingArena({
         )}
 
         {/* Focus mode: minimal timer only */}
-        {focusMode && state.startedAtMs && state.status !== 'finished' && (
+        {focusMode && mode === 'time' && state.startedAtMs && state.status !== 'finished' && (
           <div className="mb-6 text-center">
             <span className="text-4xl font-mono font-bold text-primary">
               {timeRemaining}

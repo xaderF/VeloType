@@ -47,36 +47,40 @@ export function useAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch fresh profile using stored token on mount
+  const refreshProfile = useCallback(async () => {
+    if (!auth.token) return null;
+    try {
+      const res = await fetch(`${API_BASE}/profile`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) {
+        clearAuth();
+        setAuth({ token: null, user: null });
+        return null;
+      }
+
+      const data = await res.json();
+      const user: AuthUser = {
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        rating: data.rating,
+        competitiveElo: data.competitiveElo ?? null,
+        placementGamesPlayed: data.placementGamesPlayed ?? 0,
+        createdAt: data.createdAt,
+      };
+      setAuth((prev) => ({ ...prev, user }));
+      persistAuth(auth.token, user);
+      return user;
+    } catch {
+      return null;
+    }
+  }, [auth.token]);
+
+  // Fetch fresh profile using stored token on mount.
   useEffect(() => {
-    if (!auth.token) return;
-    void (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/profile`, {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const user: AuthUser = {
-            id: data.id,
-            username: data.username,
-            email: data.email,
-            rating: data.rating,
-            competitiveElo: data.competitiveElo ?? null,
-            placementGamesPlayed: data.placementGamesPlayed ?? 0,
-            createdAt: data.createdAt,
-          };
-          setAuth((prev) => ({ ...prev, user }));
-          persistAuth(auth.token!, user);
-        } else {
-          // Token expired or invalid
-          clearAuth();
-          setAuth({ token: null, user: null });
-        }
-      } catch { /* ignore, use cached */ }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void refreshProfile();
+  }, [refreshProfile]);
 
   const register = useCallback(async (username: string, password: string, email?: string) => {
     setLoading(true);
@@ -160,6 +164,7 @@ export function useAuth() {
     register,
     login,
     logout,
+    refreshProfile,
     clearError: () => setError(null),
   };
 }

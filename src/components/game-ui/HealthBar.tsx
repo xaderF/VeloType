@@ -1,6 +1,7 @@
 // HealthBar: Shows player health during the match. Used in MatchHUD.
 // Depends on: framer-motion, cn util.
 // Props: current, max, showDamage, isPlayer, className.
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -19,11 +20,26 @@ export function HealthBar({
   isPlayer = true,
   className 
 }: HealthBarProps) {
-  const percentage = Math.max(0, (current / max) * 100);
+  const percentage = useMemo(() => {
+    const safeMax = Math.max(1, max);
+    return Math.max(0, Math.min(100, (current / safeMax) * 100));
+  }, [current, max]);
+  const [displayPercentage, setDisplayPercentage] = useState(percentage);
+  const [damageTrail, setDamageTrail] = useState<{ id: number; from: number; to: number } | null>(null);
+
+  useEffect(() => {
+    setDamageTrail((prev) => {
+      if (percentage < displayPercentage) {
+        return { id: Date.now(), from: displayPercentage, to: percentage };
+      }
+      return prev;
+    });
+    setDisplayPercentage(percentage);
+  }, [displayPercentage, percentage]);
   
   const getGradientClass = () => {
-    if (percentage > 60) return 'hp-gradient-full';
-    if (percentage > 30) return 'hp-gradient-mid';
+    if (displayPercentage > 60) return 'hp-gradient-full';
+    if (displayPercentage > 30) return 'hp-gradient-mid';
     return 'hp-gradient-low';
   };
 
@@ -61,16 +77,32 @@ export function HealthBar({
             "h-full rounded-full relative",
             getGradientClass()
           )}
-          initial={{ width: '100%' }}
-          animate={{ width: `${percentage}%` }}
+          initial={false}
+          animate={{ width: `${displayPercentage}%` }}
           transition={{ 
-            duration: 0.5, 
-            ease: "easeOut",
+            duration: 0.45, 
+            ease: "easeOut"
           }}
         >
           {/* Shine effect */}
           <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-black/20" />
         </motion.div>
+
+        {damageTrail && damageTrail.from > damageTrail.to && (
+          <motion.div
+            key={damageTrail.id}
+            className="absolute top-0 bottom-0 bg-damage/50"
+            style={{ left: `${damageTrail.to}%` }}
+            initial={{ width: `${damageTrail.from - damageTrail.to}%`, opacity: 0.75 }}
+            animate={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.65, ease: 'easeOut' }}
+            onAnimationComplete={() => {
+              setDamageTrail((currentTrail) => (
+                currentTrail?.id === damageTrail.id ? null : currentTrail
+              ));
+            }}
+          />
+        )}
 
         {/* Damage flash overlay */}
         {showDamage && showDamage > 0 && (

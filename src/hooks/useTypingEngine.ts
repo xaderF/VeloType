@@ -58,12 +58,13 @@ export function useTypingEngine({
   // Tick interval for time-based mode and consistency sampling
   useEffect(() => {
     if (!isActive || state.status === 'finished') return;
+    if (startOnFirstKeystroke && mode === 'time' && state.startedAtMs === null) return;
     const interval = setInterval(() => {
       dispatch({ type: 'TICK', payload: { nowMs: Date.now() } });
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isActive, state.status]);
+  }, [isActive, mode, startOnFirstKeystroke, state.startedAtMs, state.status]);
 
   // Start timed rounds immediately (without waiting for first keypress),
   // unless startOnFirstKeystroke is set (used by practice / free-type mode).
@@ -87,15 +88,17 @@ export function useTypingEngine({
       const second = state.samples.length;
       const elapsedMs = second * 1000;
       const correct = countCorrectChars(state.target, state.typed);
-      const wpm = computeWpm(correct, elapsedMs);
-      const raw = computeRawWpm(state.typed.length, elapsedMs);
+      const keystrokes = Math.max(state.totalKeystrokes, state.typed.length);
+      const correctedErrors = Math.max(0, state.totalErrors - state.errors);
+      const wpm = computeWpm(correct, elapsedMs) + Math.floor(correctedErrors / 3);
+      const raw = computeRawWpm(keystrokes, elapsedMs);
       wpmHistoryRef.current = [
         ...wpmHistoryRef.current,
         { second, wpm: Math.round(wpm), raw: Math.round(raw), errors: state.errors },
       ];
       lastHistoryLen.current = state.samples.length;
     }
-  }, [state.samples.length, state.target, state.typed, state.errors, state.startedAtMs]);
+  }, [state.samples.length, state.target, state.typed, state.errors, state.startedAtMs, state.totalErrors, state.totalKeystrokes]);
 
   // Notify completion exactly once
   useEffect(() => {
@@ -109,8 +112,8 @@ export function useTypingEngine({
     const finalWpmTime = mode === 'time' ? timeLimitMs : metrics.elapsedMs;
 
     const stats: RoundStats = {
-      wpm: computeWpm(metrics.correctChars, finalWpmTime),
-      rawWpm: computeRawWpm(metrics.totalTyped, finalWpmTime),
+      wpm: computeWpm(metrics.correctChars, finalWpmTime) + Math.floor(Math.max(0, metrics.totalErrors - metrics.errors) / 3),
+      rawWpm: computeRawWpm(Math.max(metrics.totalTyped, metrics.totalKeystrokes), finalWpmTime),
       accuracy: metrics.accuracy,
       consistency: metrics.consistency,
       errors: metrics.errors,

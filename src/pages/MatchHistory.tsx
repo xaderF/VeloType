@@ -5,6 +5,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { RankBadge } from '@/components/game-ui/RankBadge';
+import { LobbyPageShell } from '@/components/layout/LobbyPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -84,6 +85,15 @@ interface MatchDetail {
   players: MatchDetailPlayer[];
 }
 
+interface RoundBreakdown {
+  round: number;
+  youChars: number;
+  opponentChars: number;
+  youWpm: number;
+  opponentWpm: number;
+  winner: 'you' | 'opponent' | 'draw';
+}
+
 // ---------------------------------------------------------------------------
 // Match History List
 // ---------------------------------------------------------------------------
@@ -114,19 +124,19 @@ export function MatchHistoryList() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <LobbyPageShell contentClassName="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <p className="text-muted-foreground">Log in to view your match history.</p>
           <Link to="/" className="text-primary underline">
             Go Home
           </Link>
         </div>
-      </div>
+      </LobbyPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <LobbyPageShell contentClassName="p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <Link to="/profile" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -171,7 +181,7 @@ export function MatchHistoryList() {
           </div>
         )}
       </div>
-    </div>
+    </LobbyPageShell>
   );
 }
 
@@ -200,39 +210,44 @@ export function MatchDetailView() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <LobbyPageShell contentClassName="min-h-screen flex items-center justify-center p-4">
         <p className="text-muted-foreground">Log in to view match details.</p>
-      </div>
+      </LobbyPageShell>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <LobbyPageShell contentClassName="min-h-screen flex items-center justify-center p-4">
         <div className="text-muted-foreground animate-pulse">Loading match...</div>
-      </div>
+      </LobbyPageShell>
     );
   }
 
   if (!match) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <LobbyPageShell contentClassName="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <p className="text-muted-foreground">Match not found.</p>
           <button onClick={() => navigate('/history')} className="text-primary underline">
             Back to History
           </button>
         </div>
-      </div>
+      </LobbyPageShell>
     );
   }
 
   const you = match.players.find((p) => p.userId === user?.id);
   const opponent = match.players.find((p) => p.userId !== user?.id);
   const date = new Date(match.createdAt);
+  const rounds = buildRoundBreakdown(you?.progressSamples ?? [], opponent?.progressSamples ?? [], match.limit);
+  const isPlacementGame = you?.ratingBefore == null;
+  const youDelta = you
+    ? resolveDisplayRatingDelta(you.ratingDelta, you.ratingBefore, you.ratingAfter, you.result)
+    : 0;
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <LobbyPageShell contentClassName="p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <button
@@ -252,8 +267,8 @@ export function MatchDetailView() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold">
-                    {you?.result === 'win' ? '🎉 Victory' : you?.result === 'loss' ? '💀 Defeat' : '🤝 Draw'}
+                  <h2 className="text-xl font-bold uppercase tracking-wide">
+                    {you?.result === 'win' ? 'Win' : you?.result === 'loss' ? 'Loss' : 'Draw'}
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1">
                     {date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -261,21 +276,27 @@ export function MatchDetailView() {
                     {match.mode} {match.limit}s
                   </p>
                 </div>
-                {you?.ratingDelta != null && (
+                {you && (
                   <div className="text-right">
-                    <div
-                      className={cn(
-                        'text-2xl font-bold',
-                        you.ratingDelta > 0 && 'text-green-400',
-                        you.ratingDelta < 0 && 'text-red-400',
-                        you.ratingDelta === 0 && 'text-muted-foreground',
-                      )}
-                    >
-                      {you.ratingDelta > 0 ? '+' : ''}{you.ratingDelta}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {you.ratingBefore} → {you.ratingAfter}
-                    </div>
+                    {isPlacementGame ? (
+                      <div className="text-2xl font-bold text-primary">PLACEMENT +1</div>
+                    ) : (
+                      <div
+                        className={cn(
+                          'text-2xl font-bold',
+                          youDelta > 0 && 'text-green-400',
+                          youDelta < 0 && 'text-red-400',
+                          youDelta === 0 && 'text-muted-foreground',
+                        )}
+                      >
+                        ELO {youDelta > 0 ? '+' : ''}{youDelta}
+                      </div>
+                    )}
+                    {(you.ratingBefore != null && you.ratingAfter != null) && (
+                      <div className="text-xs text-muted-foreground">
+                        {you.ratingBefore} → {you.ratingAfter}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -304,7 +325,7 @@ export function MatchDetailView() {
             <Card className="border-border bg-card/80">
               <CardContent className="p-6">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                  Progress Over Time (typed chars)
+                  Performance Over Time (WPM pace)
                 </h3>
                 <WpmGraph
                   youSamples={you?.progressSamples ?? []}
@@ -315,6 +336,53 @@ export function MatchDetailView() {
             </Card>
           </motion.div>
         ) : null}
+
+        {rounds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Card className="border-border bg-card/80">
+              <CardContent className="p-6 space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground">Round Breakdown</h3>
+                <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory">
+                  {rounds.map((round) => (
+                    <div
+                      key={round.round}
+                      className={cn(
+                        'min-w-[240px] rounded-lg border p-3 snap-start',
+                        round.winner === 'you' && 'border-green-500/30 bg-green-500/[0.06]',
+                        round.winner === 'opponent' && 'border-red-500/30 bg-red-500/[0.06]',
+                        round.winner === 'draw' && 'border-border bg-secondary/20',
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-semibold">Round {round.round}</p>
+                        <span
+                          className={cn(
+                            'text-xs font-semibold uppercase',
+                            round.winner === 'you' && 'text-green-400',
+                            round.winner === 'opponent' && 'text-red-400',
+                            round.winner === 'draw' && 'text-muted-foreground',
+                          )}
+                        >
+                          {round.winner === 'you' ? 'Win' : round.winner === 'opponent' ? 'Loss' : 'Draw'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <MetricChip label="You WPM" value={round.youWpm} />
+                        <MetricChip label="Opp WPM" value={round.opponentWpm} />
+                        <MetricChip label="You Chars" value={round.youChars} />
+                        <MetricChip label="Opp Chars" value={round.opponentChars} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Match meta */}
         <motion.div
@@ -328,7 +396,7 @@ export function MatchDetailView() {
           <span>Limit: {match.limit}s</span>
         </motion.div>
       </div>
-    </div>
+    </LobbyPageShell>
   );
 }
 
@@ -338,9 +406,14 @@ export function MatchDetailView() {
 
 function MatchRow({ match }: { match: MatchListEntry }) {
   const result = match.you.result;
-  const wpm = match.you.wpm;
-  const acc = match.you.accuracy;
-  const delta = match.you.ratingDelta;
+  const resultLabel = result === 'win' ? 'WIN' : result === 'loss' ? 'LOSS' : result === 'draw' ? 'DRAW' : '—';
+  const isPlacementGame = match.you.ratingBefore == null;
+  const delta = resolveDisplayRatingDelta(
+    match.you.ratingDelta,
+    match.you.ratingBefore,
+    match.you.ratingAfter,
+    result,
+  );
   const oppName = match.opponent?.username ?? 'Unknown';
   const date = new Date(match.createdAt);
 
@@ -364,31 +437,30 @@ function MatchRow({ match }: { match: MatchListEntry }) {
               result === 'draw' && 'bg-muted text-muted-foreground',
             )}
           >
-            {result ?? '?'}
+            {resultLabel}
           </span>
           <div>
             <span className="text-sm font-medium">vs {oppName}</span>
-            {match.opponent?.rating != null && (
-              <RankBadge rating={match.opponent.rating} size="sm" className="ml-2" />
-            )}
             <div className="text-xs text-muted-foreground">
               {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {' · '}
+              {match.limit}s {match.mode}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          {wpm != null && <span className="font-mono">{Math.round(wpm)} WPM</span>}
-          {acc != null && <span className="text-muted-foreground">{Math.round(acc * 100)}%</span>}
-          {delta != null && (
+          {isPlacementGame ? (
+            <span className="font-semibold min-w-[6.5rem] text-right text-primary">PLACEMENT +1</span>
+          ) : (
             <span
               className={cn(
-                'font-semibold min-w-[2.5rem] text-right',
+                'font-semibold min-w-[4.5rem] text-right',
                 delta > 0 && 'text-green-400',
                 delta < 0 && 'text-red-400',
                 delta === 0 && 'text-muted-foreground',
               )}
             >
-              {delta > 0 ? '+' : ''}{delta}
+              ELO {delta > 0 ? '+' : ''}{delta}
             </span>
           )}
         </div>
@@ -406,6 +478,14 @@ function PlayerStatsCard({
   label: string;
   isWinner: boolean;
 }) {
+  const isPlacementGame = player.ratingBefore == null;
+  const delta = resolveDisplayRatingDelta(
+    player.ratingDelta,
+    player.ratingBefore,
+    player.ratingAfter,
+    player.result,
+  );
+
   return (
     <Card
       className={cn(
@@ -440,6 +520,7 @@ function PlayerStatsCard({
           <StatRow label="Errors" value={player.errors ?? '—'} />
           <StatRow label="Damage Dealt" value={player.damageDealt != null ? Math.round(player.damageDealt) : '—'} />
           <StatRow label="Damage Taken" value={player.damageTaken != null ? Math.round(player.damageTaken) : '—'} />
+          <StatRow label={isPlacementGame ? 'Placement' : 'ELO'} value={isPlacementGame ? '+1' : `${delta > 0 ? '+' : ''}${delta}`} />
         </div>
       </CardContent>
     </Card>
@@ -455,6 +536,81 @@ function StatRow({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function splitProgressIntoRounds(samples: number[], roundLimitSeconds: number): number[][] {
+  if (!samples.length) return [];
+
+  const rounds: number[][] = [];
+  let current: number[] = [];
+
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.max(0, samples[i] ?? 0);
+    const prev = i > 0 ? Math.max(0, samples[i - 1] ?? 0) : 0;
+    const resetDetected = i > 0 && value + 2 < prev;
+
+    if (resetDetected && current.length) {
+      rounds.push(current);
+      current = [value];
+    } else {
+      current.push(value);
+    }
+  }
+
+  if (current.length) rounds.push(current);
+
+  if (rounds.length <= 1 && samples.length > roundLimitSeconds + 4) {
+    const chunked: number[][] = [];
+    for (let i = 0; i < samples.length; i += roundLimitSeconds) {
+      const slice = samples.slice(i, i + roundLimitSeconds).map((n) => Math.max(0, n ?? 0));
+      if (slice.length) chunked.push(slice);
+    }
+    if (chunked.length > 1) return chunked;
+  }
+
+  return rounds;
+}
+
+function buildRoundBreakdown(
+  youSamples: number[],
+  opponentSamples: number[],
+  roundLimitSeconds: number,
+): RoundBreakdown[] {
+  const youRounds = splitProgressIntoRounds(youSamples, roundLimitSeconds);
+  const opponentRounds = splitProgressIntoRounds(opponentSamples, roundLimitSeconds);
+  const total = Math.max(youRounds.length, opponentRounds.length);
+  const seconds = Math.max(1, roundLimitSeconds);
+
+  return Array.from({ length: total }, (_, idx) => {
+    const y = youRounds[idx] ?? [];
+    const o = opponentRounds[idx] ?? [];
+    const youChars = y.length ? Math.max(...y) : 0;
+    const opponentChars = o.length ? Math.max(...o) : 0;
+    const youWpm = Math.round((youChars / 5) / (seconds / 60));
+    const opponentWpm = Math.round((opponentChars / 5) / (seconds / 60));
+
+    return {
+      round: idx + 1,
+      youChars,
+      opponentChars,
+      youWpm,
+      opponentWpm,
+      winner: youChars > opponentChars ? 'you' : opponentChars > youChars ? 'opponent' : 'draw',
+    };
+  });
+}
+
+function resolveDisplayRatingDelta(
+  explicitDelta: number | null,
+  ratingBefore: number | null,
+  ratingAfter: number | null,
+  result: string | null,
+) {
+  if (explicitDelta != null) return explicitDelta;
+  if (ratingBefore != null && ratingAfter != null) return ratingAfter - ratingBefore;
+  if (result === 'win') return 12;
+  if (result === 'loss') return -12;
+  return 0;
+}
+
 function WpmGraph({
   youSamples,
   opponentSamples,
@@ -465,10 +621,19 @@ function WpmGraph({
   opponentName: string;
 }) {
   const maxLen = Math.max(youSamples.length, opponentSamples.length);
+
+  const toWpm = (samples: number[], index: number): number | null => {
+    const curr = samples[index];
+    if (curr == null) return null;
+    const prev = index > 0 ? (samples[index - 1] ?? 0) : 0;
+    const delta = curr >= prev ? curr - prev : curr;
+    return Math.max(0, delta * 12);
+  };
+
   const data = Array.from({ length: maxLen }, (_, i) => ({
     second: i + 1,
-    you: youSamples[i] ?? null,
-    opponent: opponentSamples[i] ?? null,
+    you: toWpm(youSamples, i),
+    opponent: toWpm(opponentSamples, i),
   }));
 
   return (
@@ -482,7 +647,7 @@ function WpmGraph({
         />
         <YAxis
           tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-          label={{ value: 'Chars typed', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+          label={{ value: 'WPM', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
         />
         <Tooltip
           contentStyle={{

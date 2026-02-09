@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { getBearerToken, verifyAuthToken } from '../auth.js';
 import { prisma } from '../db.js';
+import { env } from '../env.js';
 import { generateText } from '../engine/text.js';
 import {
   computeServerMetrics,
@@ -10,11 +12,42 @@ import {
 
 // ---------------------------------------------------------------------------
 // Daily seed — deterministic from the date string so every player gets the
-// same text on the same calendar day (UTC).
+// same text on the same calendar day in a fixed reset timezone.
 // ---------------------------------------------------------------------------
 
-function getDailyDate(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD in UTC
+const dailyDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: env.DAILY_RESET_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function getDailyDate(at: Date = new Date()): string {
+  const parts = dailyDateFormatter.formatToParts(at);
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  if (!year || !month || !day) {
+    throw new Error('Failed to derive daily date from formatter parts');
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function getNextResetAt(at: Date = new Date()): string {
+  const currentDate = getDailyDate(at);
+  let low = at.getTime() + 1000;
+  let high = at.getTime() + 36 * 60 * 60 * 1000;
+
+  while (high - low > 1000) {
+    const mid = Math.floor((low + high) / 2);
+    if (getDailyDate(new Date(mid)) === currentDate) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+
+  return new Date(high).toISOString();
 }
 
 function getDailySeed(date: string): string {
@@ -138,6 +171,7 @@ export async function leaderboardRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   app.get('/daily', async (request: FastifyRequest, reply: FastifyReply) => {
     const date = getDailyDate();
+    const nextResetAt = getNextResetAt();
     const seed = getDailySeed(date);
     const targetText = generateText({ seed, length: 200, difficulty: 'medium', includePunctuation: false });
 
@@ -167,7 +201,15 @@ export async function leaderboardRoutes(app: FastifyInstance) {
       }
     }
 
-    return { date, seed, targetText, alreadyPlayed, myScore };
+    return {
+      date,
+      nextResetAt,
+      resetTimezone: env.DAILY_RESET_TIMEZONE,
+      seed,
+      targetText,
+      alreadyPlayed,
+      myScore,
+    };
   });
 
   // ---- POST /daily/submit ---------------------------------------------------
@@ -212,21 +254,30 @@ export async function leaderboardRoutes(app: FastifyInstance) {
       const metrics = computeServerMetrics(targetText, clampedTyped, elapsedMs, [], undefined, totalErrors, totalKeystrokes);
       const perfScore = performanceScore(metrics.wpm, metrics.accuracy, metrics.consistency);
 
-      const record = await db.dailyScore.create({
-        data: {
-          userId: authUser.id,
-          date,
-          seed,
-          wpm: metrics.wpm,
-          rawWpm: metrics.rawWpm,
-          accuracy: metrics.accuracy,
-          consistency: metrics.consistency,
-          score: perfScore,
-          correctChars: metrics.correctChars,
-          totalTyped: metrics.totalTyped,
-          errors: metrics.errors,
-        },
-      });
+      let record;
+      try {
+        record = await db.dailyScore.create({
+          data: {
+            userId: authUser.id,
+            date,
+            seed,
+            wpm: metrics.wpm,
+            rawWpm: metrics.rawWpm,
+            accuracy: metrics.accuracy,
+            consistency: metrics.consistency,
+            score: perfScore,
+            correctChars: metrics.correctChars,
+            totalTyped: metrics.totalTyped,
+            errors: metrics.errors,
+          },
+        });
+      } catch (error) {
+        // Protect one-attempt-per-day invariant even under concurrent submissions.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          return reply.status(409).send({ error: 'Already submitted for today' });
+        }
+        throw error;
+      }
 
       // Return rank
       const betterCount = await db.dailyScore.count({
@@ -257,6 +308,7 @@ export async function leaderboardRoutes(app: FastifyInstance) {
 
     const date = parsedQuery.data.date ?? getDailyDate();
     const limit = parsedQuery.data.limit;
+    const today = getDailyDate();
 
     const rows = await db.dailyScore.findMany({
       where: { date },
@@ -273,6 +325,8 @@ export async function leaderboardRoutes(app: FastifyInstance) {
 
     return {
       date,
+      nextResetAt: date === today ? getNextResetAt() : null,
+      resetTimezone: env.DAILY_RESET_TIMEZONE,
       totalParticipants,
       leaderboard: rows.map((row, index) => ({
         rank: index + 1,

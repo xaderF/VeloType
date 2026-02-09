@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MatchHUD } from '@/components/game-ui/MatchHUD';
 import { TypingArena } from '@/components/game-ui/TypingArena';
 import { TypingOptionsBar } from '@/components/game-ui/TypingOptionsBar';
+import { LetterParticles } from '@/components/game-ui/LetterParticles';
+import { ForfeitConfirmDialog } from '@/components/game-ui/ForfeitConfirmDialog';
 import { MatchState } from '@/types/game';
 import { RoundStats } from '@/utils/scoring';
 import { cn } from '@/lib/utils';
@@ -12,6 +14,8 @@ interface PlayScreenProps {
   timeRemaining: number;
   currentText: string;
   onRoundComplete: (stats: RoundStats) => void;
+  onRoundCompleteRaw?: (typed: string, samples: number[], totalErrors: number, totalKeystrokes: number) => void;
+  onProgressUpdate?: (typed: string, cursor: number, errors: number, startedAtMs: number | null) => void;
   playerDamage?: number;
   opponentDamage?: number;
   punctuationEnabled: boolean;
@@ -28,6 +32,8 @@ export function PlayScreen({
   timeRemaining,
   currentText,
   onRoundComplete,
+  onRoundCompleteRaw,
+  onProgressUpdate,
   playerDamage,
   opponentDamage,
   punctuationEnabled,
@@ -46,15 +52,23 @@ export function PlayScreen({
   };
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-grid-pattern relative">
-      {/* Subtle background effect */}
-      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-lobby-bg relative overflow-hidden">
+      <LetterParticles />
+      <div
+        className={cn(
+          'absolute inset-0 pointer-events-none transition-all duration-300',
+          isTypingActive
+            ? 'bg-lobby-bg/65 backdrop-blur-2xl'
+            : 'bg-lobby-bg/45 backdrop-blur-[2px]',
+        )}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/8 via-transparent to-lobby-bg/40 pointer-events-none" />
 
       {/* Forfeit button — top left */}
       {onForfeit && (
         <motion.button
           onClick={handleForfeitClick}
-          className="absolute top-4 left-4 z-20 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
+          className="absolute top-4 left-4 z-30 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
@@ -63,49 +77,14 @@ export function PlayScreen({
         </motion.button>
       )}
 
-      {/* Forfeit confirmation dialog */}
-      <AnimatePresence>
-        {showForfeitDialog && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="w-full max-w-sm p-6 rounded-2xl border-2 border-destructive/50 bg-card shadow-2xl space-y-5"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: 'spring', bounce: 0.3 }}
-            >
-              <div className="text-center space-y-2">
-                <div className="text-2xl font-bold text-destructive">Forfeit Match?</div>
-                <div className="text-sm text-muted-foreground">
-                  This will count as a loss and you'll lose rating points.
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowForfeitDialog(false)}
-                  className="flex-1 py-3 rounded-xl border border-border bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors"
-                >
-                  Keep Playing
-                </button>
-                <button
-                  onClick={() => {
-                    setShowForfeitDialog(false);
-                    onForfeit?.();
-                  }}
-                  className="flex-1 py-3 rounded-xl bg-destructive text-destructive-foreground font-semibold hover:bg-destructive/90 transition-colors"
-                >
-                  Forfeit
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ForfeitConfirmDialog
+        isOpen={showForfeitDialog}
+        onCancel={() => setShowForfeitDialog(false)}
+        onConfirm={() => {
+          setShowForfeitDialog(false);
+          onForfeit?.();
+        }}
+      />
 
       <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
         {/* HUD — hidden during active typing for focus */}
@@ -153,6 +132,8 @@ export function PlayScreen({
             isActive={isTypingActive}
             timeLimit={match.roundTimeSeconds}
             onComplete={onRoundComplete}
+            onCompleteRaw={onRoundCompleteRaw}
+            onProgressUpdate={onProgressUpdate}
             focusMode={isTypingActive}
             startOnFirstKeystroke={false}
           />

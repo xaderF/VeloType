@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { RankBadge } from '@/components/game-ui/RankBadge';
+import { LobbyPageShell } from '@/components/layout/LobbyPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,8 @@ interface MyRank {
 
 interface DailyInfo {
   date: string;
+  nextResetAt: string;
+  resetTimezone: string;
   alreadyPlayed: boolean;
   myScore: { wpm: number; accuracy: number; score: number; rank: number } | null;
 }
@@ -43,6 +46,24 @@ interface DailyLeaderboardEntry {
   wpm: number;
   accuracy: number;
   score: number;
+}
+
+function formatResetCountdown(nextResetAt: string | undefined, nowMs: number): string {
+  if (!nextResetAt) return '--:--:--';
+  const targetMs = Date.parse(nextResetAt);
+  if (!Number.isFinite(targetMs)) return '--:--:--';
+
+  const diffSeconds = Math.max(0, Math.floor((targetMs - nowMs) / 1000));
+  const hours = Math.floor(diffSeconds / 3600);
+  const minutes = Math.floor((diffSeconds % 3600) / 60);
+  const seconds = diffSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatResetTimezoneLabel(timezone: string | undefined): string {
+  if (!timezone) return 'ET';
+  return timezone === 'America/New_York' ? 'ET' : timezone;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +77,7 @@ export default function Leaderboard() {
   const [offset, setOffset] = useState(0);
   const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const limit = 50;
 
   // Daily challenge mini-state
@@ -101,9 +123,27 @@ export default function Leaderboard() {
 
   useEffect(() => { fetchLeaderboard(); }, [fetchLeaderboard]);
   useEffect(() => { fetchDaily(); }, [fetchDaily]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Keep the daily sidebar in sync with calendar-day reset while page stays open.
+  useEffect(() => {
+    if (!daily?.nextResetAt) return;
+    const nextResetMs = Date.parse(daily.nextResetAt);
+    if (!Number.isFinite(nextResetMs)) return;
+
+    const delayMs = Math.max(1000, nextResetMs - Date.now() + 1000);
+    const timer = window.setTimeout(() => {
+      void fetchDaily();
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [daily?.nextResetAt, fetchDaily]);
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <LobbyPageShell contentClassName="p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -194,6 +234,9 @@ export default function Leaderboard() {
                     {daily?.date ?? '—'}
                   </Badge>
                 </div>
+                <div className="text-[11px] text-muted-foreground font-mono text-center">
+                  resets in {formatResetCountdown(daily?.nextResetAt, nowMs)} {formatResetTimezoneLabel(daily?.resetTimezone)}
+                </div>
 
                 {daily?.alreadyPlayed && daily.myScore ? (
                   <div className="space-y-2">
@@ -256,7 +299,7 @@ export default function Leaderboard() {
           </motion.div>
         </div>
       </div>
-    </div>
+    </LobbyPageShell>
   );
 }
 

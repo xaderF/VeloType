@@ -76,6 +76,35 @@ A multi-player competitive mode built on the same core scoring system.
 
 ---
 
+## Round Damage Model (1v1 / 1vAI)
+
+Round combat uses a normalized score per player:
+
+- `roundScore` is in `0..100`
+- `damageDealt = max(0, roundScoreA - roundScoreB)`
+- max possible round damage is `70`
+
+A player reaches score `100` when both are true:
+
+- accuracy is `100%`
+- WPM is at least `(rank max WPM + 10)`
+
+### Rank WPM Reference
+
+| Rank | MMR Range | Max WPM (band) | WPM for score 100 |
+|---|---:|---:|---:|
+| Iron | 0-299 | 43 | 53 |
+| Bronze | 300-599 | 51 | 61 |
+| Silver | 600-899 | 59 | 69 |
+| Gold | 900-1199 | 67 | 77 |
+| Platinum | 1200-1499 | 75 | 85 |
+| Diamond | 1500-1799 | 85 | 95 |
+| Velocity | 1800-2099 | 97 | 107 |
+| Apex | 2100-2399 | 110 | 120 |
+| Paragon | 2400+ | 125 | 135 |
+
+---
+
 ## Tech Stack
 
 | Category    | Tools |
