@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect } from 'react';
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 const TOKEN_KEY = 'velotype_auth_token';
 const USER_KEY = 'velotype_auth_user';
+const STORAGE_MODE_KEY = 'velotype_auth_storage_mode';
 
 export interface AuthUser {
   id: string;
@@ -23,8 +24,17 @@ interface AuthState {
 
 function loadPersistedAuth(): AuthState {
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const userJson = localStorage.getItem(USER_KEY);
+    const persistedMode = localStorage.getItem(STORAGE_MODE_KEY);
+    const storage = persistedMode === 'local' ? localStorage : sessionStorage;
+    const fallbackStorage = persistedMode === 'local' ? sessionStorage : localStorage;
+
+    let token = storage.getItem(TOKEN_KEY);
+    let userJson = storage.getItem(USER_KEY);
+    if (!token || !userJson) {
+      token = fallbackStorage.getItem(TOKEN_KEY);
+      userJson = fallbackStorage.getItem(USER_KEY);
+    }
+
     if (token && userJson) {
       return { token, user: JSON.parse(userJson) as AuthUser };
     }
@@ -32,14 +42,28 @@ function loadPersistedAuth(): AuthState {
   return { token: null, user: null };
 }
 
-function persistAuth(token: string, user: AuthUser) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+function persistAuth(token: string, user: AuthUser, rememberMe: boolean) {
+  const primaryStorage = rememberMe ? localStorage : sessionStorage;
+  const secondaryStorage = rememberMe ? sessionStorage : localStorage;
+
+  primaryStorage.setItem(TOKEN_KEY, token);
+  primaryStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(STORAGE_MODE_KEY, rememberMe ? 'local' : 'session');
+
+  secondaryStorage.removeItem(TOKEN_KEY);
+  secondaryStorage.removeItem(USER_KEY);
 }
 
 function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(STORAGE_MODE_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+}
+
+function isRememberedSession(token: string) {
+  return localStorage.getItem(STORAGE_MODE_KEY) === 'local' && localStorage.getItem(TOKEN_KEY) === token;
 }
 
 export function useAuth() {
@@ -70,7 +94,7 @@ export function useAuth() {
         createdAt: data.createdAt,
       };
       setAuth((prev) => ({ ...prev, user }));
-      persistAuth(auth.token, user);
+      persistAuth(auth.token, user, isRememberedSession(auth.token));
       return user;
     } catch {
       return null;
@@ -82,14 +106,14 @@ export function useAuth() {
     void refreshProfile();
   }, [refreshProfile]);
 
-  const register = useCallback(async (username: string, password: string, email?: string) => {
+  const register = useCallback(async (username: string, password: string, email: string, rememberMe = false) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, email }),
+        body: JSON.stringify({ username, password, email, acceptedTerms: true, rememberMe }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -105,7 +129,7 @@ export function useAuth() {
         placementGamesPlayed: data.user.placementGamesPlayed ?? 0,
         createdAt: data.user.createdAt,
       };
-      persistAuth(data.token, user);
+      persistAuth(data.token, user, rememberMe);
       setAuth({ token: data.token, user });
       return true;
     } catch (err) {
@@ -116,14 +140,14 @@ export function useAuth() {
     }
   }, []);
 
-  const login = useCallback(async (usernameOrEmail: string, password: string) => {
+  const login = useCallback(async (usernameOrEmail: string, password: string, rememberMe = false) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernameOrEmail, password }),
+        body: JSON.stringify({ usernameOrEmail, password, rememberMe }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -139,7 +163,7 @@ export function useAuth() {
         placementGamesPlayed: data.user.placementGamesPlayed ?? 0,
         createdAt: data.user.createdAt,
       };
-      persistAuth(data.token, user);
+      persistAuth(data.token, user, rememberMe);
       setAuth({ token: data.token, user });
       return true;
     } catch (err) {
@@ -155,6 +179,45 @@ export function useAuth() {
     setAuth({ token: null, user: null });
   }, []);
 
+  const deleteAccount = useCallback(async (password?: string) => {
+    if (!auth.token) return false;
+    try {
+      const res = await fetch(`${API_BASE}/profile`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: password ? JSON.stringify({ password }) : undefined,
+      });
+      if (!res.ok) return false;
+      clearAuth();
+      setAuth({ token: null, user: null });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [auth.token]);
+
+  const exportData = useCallback(async () => {
+    if (!auth.token) return;
+    try {
+      const res = await fetch(`${API_BASE}/profile/export`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `velotype-data-export.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch { /* silent */ }
+  }, [auth.token]);
+
   return {
     token: auth.token,
     user: auth.user,
@@ -164,6 +227,8 @@ export function useAuth() {
     register,
     login,
     logout,
+    deleteAccount,
+    exportData,
     refreshProfile,
     clearError: () => setError(null),
   };

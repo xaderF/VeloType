@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import { env } from './env.js';
@@ -27,9 +28,9 @@ app.setErrorHandler((error, request, reply) => {
     'Unhandled route error',
   );
 
-  const statusCode = error.statusCode ?? 500;
+  const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
   reply.status(statusCode).send({
-    error: statusCode >= 500 ? 'Internal Server Error' : error.message,
+    error: statusCode >= 500 ? 'Internal Server Error' : (error as Error).message,
   });
 });
 
@@ -48,7 +49,30 @@ app.addHook('onResponse', async (request, reply) => {
   );
 });
 
-await app.register(cors, { origin: true });
+await app.register(helmet, {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'wss:', 'ws:'],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  // HSTS, X-Frame-Options, X-Content-Type-Options are enabled by default
+});
+
+const allowedOrigins = env.CORS_ORIGIN
+  ? env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+  : ['http://localhost:8080', 'http://127.0.0.1:8080']; // dev-only defaults
+
+await app.register(cors, {
+  origin: allowedOrigins,
+  credentials: true,
+});
 
 // Global rate limit: 100 requests per minute per IP
 await app.register(rateLimit, {

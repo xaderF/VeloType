@@ -701,7 +701,7 @@ export function useOnlineMatch(authToken: string | null) {
 
     mm.joinQueue(authToken);
     mmSocketRef.current = mm;
-  }, [applyRoundEnd, authToken, buildRoundText, startInitialTimeline, startProgressReporting, startRoundClock, stopProgressReporting, stopRoundClock, stopTransitionTimers]);
+  }, [applyRoundEnd, authToken, buildRoundText, clearForfeitPending, startInitialTimeline, startProgressReporting, startRoundClock, stopProgressReporting, stopRoundClock, stopTransitionTimers]);
 
   const cancelQueue = useCallback(() => {
     mmSocketRef.current?.leaveQueue();

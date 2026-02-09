@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { getBearerToken, verifyAuthToken } from '../auth.js';
+import { getBearerToken, verifyAuthToken, verifyPassword, revokeToken, decryptPii, encryptPii, hashEmailForLookup, normalizeEmail } from '../auth.js';
 import { prisma } from '../db.js';
 
 const DATABASE_UNAVAILABLE_MESSAGE = 'Database is not configured. Set DATABASE_URL and run migrations.';
@@ -15,6 +15,8 @@ export async function profileRoutes(app: FastifyInstance) {
     app.get('/profile', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
     app.get('/profile/stats', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
     app.patch('/profile', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
+    app.get('/profile/export', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
+    app.delete('/profile', async (_request: FastifyRequest, reply: FastifyReply) => sendDatabaseUnavailable(reply));
     return;
   }
 
@@ -28,7 +30,7 @@ export async function profileRoutes(app: FastifyInstance) {
       .max(24)
       .regex(/^[A-Za-z0-9_]+$/, 'Username may only include letters, numbers, and underscores')
       .optional(),
-    email: z.string().trim().email().nullable().optional(),
+    email: z.string().trim().email().optional(),
     settings: z.record(z.string(), z.unknown()).optional(),
   });
 
@@ -50,7 +52,7 @@ export async function profileRoutes(app: FastifyInstance) {
     return {
       id: profile.id,
       username: profile.username,
-      email: profile.email,
+      email: profile.email ? decryptPii(profile.email) : null,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
       rating: profile.rating?.rating ?? null,
@@ -140,10 +142,11 @@ export async function profileRoutes(app: FastifyInstance) {
     }
 
     const nextUsername = parsed.data.username?.toLowerCase();
-    const nextEmail = parsed.data.email?.toLowerCase() ?? parsed.data.email;
+    const nextEmail = parsed.data.email ? normalizeEmail(parsed.data.email) : undefined;
     const dataToUpdate: {
       username?: string;
       email?: string | null;
+      emailHash?: string | null;
       settings?: Prisma.InputJsonValue;
     } = {};
 
@@ -158,17 +161,17 @@ export async function profileRoutes(app: FastifyInstance) {
       dataToUpdate.username = nextUsername;
     }
 
-    if (parsed.data.email !== undefined) {
-      if (nextEmail) {
-        const existing = await db.user.findUnique({
-          where: { email: nextEmail },
-          select: { id: true },
-        });
-        if (existing && existing.id !== authUser.id) {
-          return reply.status(409).send({ error: 'Email already in use' });
-        }
+    if (nextEmail !== undefined) {
+      const nextEmailHash = hashEmailForLookup(nextEmail);
+      const existing = await db.user.findUnique({
+        where: { emailHash: nextEmailHash },
+        select: { id: true },
+      });
+      if (existing && existing.id !== authUser.id) {
+        return reply.status(409).send({ error: 'Email already in use' });
       }
-      dataToUpdate.email = nextEmail;
+      dataToUpdate.email = encryptPii(nextEmail);
+      dataToUpdate.emailHash = nextEmailHash;
     }
 
     if (parsed.data.settings !== undefined) {
@@ -184,12 +187,142 @@ export async function profileRoutes(app: FastifyInstance) {
     return {
       id: updated.id,
       username: updated.username,
-      email: updated.email,
+      email: updated.email ? decryptPii(updated.email) : null,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
       rating: updated.rating?.rating ?? null,
       competitiveElo: updated.rating?.competitiveElo ?? null,
       settings: updated.settings,
     };
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /profile/export — GDPR data portability (Article 20)
+  // Returns all personal data associated with the authenticated user.
+  // -------------------------------------------------------------------------
+  app.get('/profile/export', async (request: FastifyRequest, reply: FastifyReply) => {
+    const token = getBearerToken(request.headers.authorization);
+    const authUser = token ? verifyAuthToken(token) : null;
+    if (!authUser) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: authUser.id },
+      include: {
+        rating: true,
+        matches: {
+          include: { match: { select: { id: true, seed: true, mode: true, limit: true, status: true, createdAt: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+        dailyScores: { orderBy: { date: 'desc' } },
+      },
+    });
+
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        id: user.id,
+        username: user.username,
+        email: user.email ? decryptPii(user.email) : null,
+        oauthProvider: user.oauthProvider,
+        settings: user.settings,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      rating: user.rating
+        ? {
+            rating: user.rating.rating,
+            competitiveElo: user.rating.competitiveElo,
+            placementGamesPlayed: user.rating.placementGamesPlayed,
+          }
+        : null,
+      matches: user.matches.map((mp) => ({
+        matchId: mp.matchId,
+        mode: mp.match.mode,
+        limit: mp.match.limit,
+        status: mp.match.status,
+        playedAt: mp.match.createdAt,
+        wpm: mp.wpm,
+        rawWpm: mp.rawWpm,
+        accuracy: mp.accuracy,
+        consistency: mp.consistency,
+        score: mp.score,
+        result: mp.result,
+        damageDealt: mp.damageDealt,
+        damageTaken: mp.damageTaken,
+        errors: mp.errors,
+        correctChars: mp.correctChars,
+        totalTyped: mp.totalTyped,
+        ratingBefore: mp.ratingBefore,
+        ratingAfter: mp.ratingAfter,
+        ratingDelta: mp.ratingDelta,
+      })),
+      dailyScores: user.dailyScores.map((ds) => ({
+        date: ds.date,
+        wpm: ds.wpm,
+        rawWpm: ds.rawWpm,
+        accuracy: ds.accuracy,
+        consistency: ds.consistency,
+        score: ds.score,
+        correctChars: ds.correctChars,
+        totalTyped: ds.totalTyped,
+        errors: ds.errors,
+        createdAt: ds.createdAt,
+      })),
+    };
+
+    reply.header('Content-Disposition', `attachment; filename="velotype-data-export-${authUser.id}.json"`);
+    reply.header('Content-Type', 'application/json');
+    return exportData;
+  });
+
+  // -------------------------------------------------------------------------
+  // DELETE /profile — GDPR right to erasure (Article 17)
+  // Permanently deletes the user and all associated data.
+  // Requires password re-entry for security.
+  // -------------------------------------------------------------------------
+  const deleteBodySchema = z.object({
+    password: z.string().min(1),
+  }).optional();
+
+  app.delete('/profile', async (request: FastifyRequest, reply: FastifyReply) => {
+    const token = getBearerToken(request.headers.authorization);
+    const authUser = token ? verifyAuthToken(token) : null;
+    if (!authUser) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+
+    // Verify user exists and get password hash
+    const user = await db.user.findUnique({ where: { id: authUser.id }, select: { id: true, passwordHash: true } });
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    // Require password re-entry for password-based accounts
+    if (user.passwordHash) {
+      const body = deleteBodySchema.safeParse(request.body);
+      const password = body.success && body.data ? body.data.password : null;
+      if (!password || !verifyPassword(password, user.passwordHash)) {
+        return reply.status(403).send({ error: 'Incorrect password' });
+      }
+    }
+
+    // Cascade delete all user-owned data in the correct order
+    await db.$transaction([
+      db.dailyScore.deleteMany({ where: { userId: authUser.id } }),
+      db.matchPlayer.deleteMany({ where: { userId: authUser.id } }),
+      db.rating.deleteMany({ where: { userId: authUser.id } }),
+      db.user.delete({ where: { id: authUser.id } }),
+    ]);
+
+    // Revoke the current token
+    if (token) revokeToken(token);
+
+    return reply.status(200).send({ success: true, message: 'Account and all associated data have been permanently deleted.' });
   });
 }

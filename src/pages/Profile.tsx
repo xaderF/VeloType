@@ -1,9 +1,10 @@
-import { useState, useEffect, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   CircleHelp,
   Crown,
+  Download,
   Flame,
   Gauge,
   Gem,
@@ -12,6 +13,7 @@ import {
   Swords,
   Target,
   Timer,
+  Trash2,
   Trophy,
   Zap,
 } from 'lucide-react';
@@ -62,10 +64,24 @@ interface MatchEntry {
 }
 
 export default function Profile() {
-  const { token, user, isAuthenticated } = useAuth();
+  const { token, user, isAuthenticated, deleteAccount, exportData } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [matches, setMatches] = useState<MatchEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deletePasswordRef = useRef<HTMLInputElement>(null);
+
+  // Focus the password input when delete confirmation is shown
+  useEffect(() => {
+    if (showDeleteConfirm) {
+      // Delay slightly to let the DOM update
+      requestAnimationFrame(() => deletePasswordRef.current?.focus());
+    }
+  }, [showDeleteConfirm]);
 
   useEffect(() => {
     if (!token) return;
@@ -217,6 +233,87 @@ export default function Profile() {
                   </div>
                 )}
               </section>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* ── Danger Zone ─────────────────────────────────────────────── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="border-border bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <CardTitle className="text-base uppercase tracking-wide text-destructive">Account &amp; Data</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Export your data</p>
+                  <p className="text-xs text-muted-foreground">Download a JSON file with all your account, match, and rating data.</p>
+                </div>
+                <button
+                  onClick={exportData}
+                  className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-secondary/60 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export Data
+                </button>
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-destructive">Delete your account</p>
+                  <p className="text-xs text-muted-foreground">Permanently delete your account and all associated data. This cannot be undone.</p>
+                </div>
+                {!showDeleteConfirm ? (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="inline-flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Account
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-destructive font-medium">Enter your password to confirm deletion:</p>
+                    <input
+                      ref={deletePasswordRef}
+                      type="password"
+                      placeholder="Password"
+                      aria-label="Confirm password for account deletion"
+                      value={deletePassword}
+                      onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(null); }}
+                      className="w-full px-3 py-2 rounded border bg-background text-foreground text-sm"
+                    />
+                    {deleteError && <p className="text-xs text-destructive">{deleteError}</p>}
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={deleting || !deletePassword}
+                        onClick={async () => {
+                          setDeleting(true);
+                          setDeleteError(null);
+                          const ok = await deleteAccount(deletePassword);
+                          if (ok) {
+                            navigate('/');
+                          } else {
+                            setDeleteError('Incorrect password');
+                          }
+                          setDeleting(false);
+                        }}
+                        className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                      >
+                        {deleting ? 'Deleting...' : 'Yes, delete everything'}
+                      </button>
+                      <button
+                        onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); setDeleteError(null); }}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-secondary/60 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>

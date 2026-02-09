@@ -1,7 +1,7 @@
 // Index.tsx
 // main page component — supports both offline (simulated) and online (WebSocket) modes.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameState } from '@/hooks/useGameState';
 import { useAuth } from '@/hooks/useAuth';
@@ -39,15 +39,54 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [staySignedIn, setStaySignedIn] = useState(true);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === 'login') {
-      await login(username, password);
+      await login(username, password, staySignedIn);
     } else {
-      await register(username, password, email || undefined);
+      await register(username, password, email, staySignedIn);
     }
   };
+
+  // Focus trap + Escape key for dialog
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    // Focus first input on mount
+    const firstInput = dialog.querySelector<HTMLInputElement>('input');
+    firstInput?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose?.();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusable = dialog.querySelectorAll<HTMLElement>(
+          'input, button, a[href], [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <motion.div
@@ -55,6 +94,10 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={mode === 'login' ? 'Log in' : 'Create account'}
+      ref={dialogRef}
     >
       <div className="w-full max-w-sm p-6 rounded-xl border border-border bg-card space-y-4">
         <h2 className="text-xl font-bold text-center">
@@ -65,6 +108,7 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
           <input
             className="w-full px-3 py-2 rounded border bg-background text-foreground"
             placeholder="Username"
+            aria-label="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -73,15 +117,18 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
           {mode === 'register' && (
             <input
               className="w-full px-3 py-2 rounded border bg-background text-foreground"
-              placeholder="Email (optional)"
+              placeholder="Email"
+              aria-label="Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
           )}
           <input
             className="w-full px-3 py-2 rounded border bg-background text-foreground"
             placeholder="Password"
+            aria-label="Password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -89,23 +136,65 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
             minLength={8}
           />
 
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <input
+              type="checkbox"
+              checked={staySignedIn}
+              onChange={(e) => setStaySignedIn(e.target.checked)}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">Stay signed in</span>
+          </label>
+
+          {mode === 'register' && (
+            <div className="space-y-2 text-sm">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 accent-primary"
+                />
+                <span className="text-muted-foreground">
+                  I agree to the{' '}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline">Terms of Service</a>
+                  {' '}and{' '}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline">Privacy Policy</a>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  className="mt-0.5 accent-primary"
+                />
+                <span className="text-muted-foreground">I confirm I am at least 13 years old</span>
+              </label>
+            </div>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (mode === 'register' && (!acceptedTerms || !ageConfirmed || !email.trim()))}
             className="w-full py-2 rounded bg-primary text-primary-foreground font-semibold disabled:opacity-50"
           >
             {loading ? 'Loading...' : mode === 'login' ? 'Log In' : 'Register'}
           </button>
         </form>
 
-        <button
-          onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); clearError(); }}
-          className="w-full text-sm text-muted-foreground hover:text-foreground"
-        >
-          {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Log In'}
-        </button>
+        <p className="w-full text-sm text-muted-foreground text-center">
+          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          <button
+            type="button"
+            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); clearError(); }}
+            className="text-foreground hover:text-primary underline underline-offset-2 transition-colors"
+          >
+            {mode === 'login' ? 'Register' : 'Log In'}
+          </button>
+        </p>
 
         {onClose && (
           <button

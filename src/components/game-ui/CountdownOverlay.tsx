@@ -23,6 +23,9 @@ export function CountdownOverlay({ count, isVisible, className }: CountdownOverl
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
         >
           <motion.div
             key={count}
