@@ -69,7 +69,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'career', label: 'CAREER', authRequired: true },
   { id: 'leaderboard', label: 'LEADERBOARD', authRequired: true },
   { id: 'store', label: 'STORE' },
-  { id: 'armory', label: 'ARMORY', authRequired: true },
+  { id: 'armory', label: 'PROFILE', authRequired: true },
   { id: 'settings', label: 'SETTINGS' },
 ];
 
@@ -112,7 +112,7 @@ export function HomeScreen({
       case 'career': onCareer(); break;
       case 'leaderboard': onLeaderboard(); break;
       case 'store': onStore?.(); break;
-      case 'armory': onArmory?.(); break;
+      case 'armory': (onArmory ?? onCareer)?.(); break;
       case 'settings': onSettings?.(); break;
     }
   };
