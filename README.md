@@ -146,3 +146,44 @@ root
 
 The following roadmap outlines planned milestones for VeloXType.  
 Features are implemented incrementally, with an emphasis on correctness, fairness, and scalability.
+
+### Phase 1 — Core Foundation
+- [x] Deterministic typing engine
+- [x] Strongly typed game logic using TypeScript
+- [x] Modular frontend architecture
+- [x] Repository structure cleanup and tooling polish
+- [x] Environment configuration standardization
+
+### Phase 2 — Persistence & Accounts
+- [x] Backend API setup
+- [x] Database integration (users, profiles, matches)
+- [x] Authentication (OAuth or email-based)
+- [x] User profiles with persisted settings
+- [x] Match history storage and retrieval
+
+### Phase 3 — Competitive Systems
+- [x] Ranked matchmaking queue
+- [x] Server-side ELO rating system
+- [x] Rank tiers and progression visualization
+- [x] Daily seeded leaderboards
+- [x] Anti-abuse and validation checks
+
+### Phase 4 — Real-Time Multiplayer
+- [x] WebSocket-based match infrastructure
+- [x] Server-authoritative 1v1 match flow
+- [x] Reconnect handling and match recovery
+- [x] Latency and performance optimization
+
+### Phase 5 — Expanded Game Modes (In Progress)
+- [ ] Battle Royale typing mode
+- [ ] Multi-round elimination mechanics
+- [ ] Player targeting and interaction systems
+- [ ] Spectator-friendly UI elements
+
+### Phase 6 — Production Readiness
+- [x] Monitoring and logging
+- [x] Rate limiting and abuse prevention
+- [x] Accessibility and UX refinements
+- [x] Performance profiling and optimization
+- [x] Legal and privacy documentation
+
