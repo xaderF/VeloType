@@ -86,7 +86,7 @@ async function verifyGithub(input: VerifyOAuthInput): Promise<VerifiedOAuthIdent
   const commonHeaders = {
     Authorization: `Bearer ${input.accessToken}`,
     Accept: 'application/vnd.github+json',
-    'User-Agent': 'velotype-server',
+    'User-Agent': 'veloxtype-server',
   };
 
   const profileRes = await fetch('https://api.github.com/user', { headers: commonHeaders });

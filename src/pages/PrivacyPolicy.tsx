@@ -20,7 +20,7 @@ export default function PrivacyPolicy() {
 
         <h2 className="text-lg font-semibold text-foreground">2. How We Use Your Information</h2>
         <p>
-          We use your data solely to operate and improve VeloType — authenticating your sessions,
+          We use your data solely to operate and improve VeloXType — authenticating your sessions,
           calculating rankings, displaying leaderboards, and providing match history. We do not sell or
           share your personal information with third parties for marketing purposes.
         </p>
@@ -57,9 +57,9 @@ export default function PrivacyPolicy() {
 
         <h2 className="text-lg font-semibold text-foreground">6. Cookies &amp; Local Storage</h2>
         <p>
-          VeloType stores your authentication token, cookie consent preference, and basic settings in
+          VeloXType stores your authentication token, cookie consent preference, and basic settings in
           your browser&rsquo;s local storage. We do not use tracking cookies or third-party analytics.
-          By using VeloType, you consent to the use of essential local storage as described here. You
+          By using VeloXType, you consent to the use of essential local storage as described here. You
           can clear this data at any time through your browser settings.
         </p>
 
@@ -87,7 +87,7 @@ export default function PrivacyPolicy() {
 
         <h2 className="text-lg font-semibold text-foreground">9. Children&rsquo;s Privacy</h2>
         <p>
-          VeloType is not directed at children under 13. We do not knowingly collect personal
+          VeloXType is not directed at children under 13. We do not knowingly collect personal
           information from children under 13 in compliance with COPPA. If you believe a child has
           provided us with personal data, please contact us so we can remove it.
         </p>
@@ -102,8 +102,8 @@ export default function PrivacyPolicy() {
         <p>
           If you have questions about this Privacy Policy or wish to exercise your data rights, please
           contact us at{' '}
-          <a href="mailto:privacy@velotype.dev" className="text-primary underline">
-            privacy@velotype.dev
+          <a href="mailto:privacy@veloxtype.dev" className="text-primary underline">
+            privacy@veloxtype.dev
           </a>
           .
         </p>
@@ -111,7 +111,7 @@ export default function PrivacyPolicy() {
 
       <div className="mt-12 text-center">
         <a href="/" className="text-sm text-primary underline">
-          ← Back to VeloType
+          ← Back to VeloXType
         </a>
       </div>
     </div>

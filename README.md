@@ -42,7 +42,7 @@ A head-to-head competitive mode where two players type the same text under ident
 - Health / damage mechanics derived from typing accuracy and speed  
 - Designed for ranked matchmaking and progression  
 
-This mode forms the competitive core of VeloType.
+This mode forms the competitive core of VeloXType.
 
 ---
 
@@ -66,7 +66,7 @@ A multi-player competitive mode built on the same core scoring system.
 
 ---
 
-## What Makes VeloType Different
+## What Makes VeloXType Different
 
 - **Competitive-first design** — built around player interaction rather than solo benchmarks  
 - **Fair by construction** — deterministic text generation removes randomness  
@@ -136,7 +136,7 @@ root
 
 ## Roadmap
 
-The following roadmap outlines planned milestones for VeloType.  
+The following roadmap outlines planned milestones for VeloXType.  
 Features are implemented incrementally, with an emphasis on correctness, fairness, and scalability.
 
 ### Phase 1 — Core Foundation

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const CONSENT_KEY = 'velotype_cookie_consent';
+const CONSENT_KEY = 'veloxtype_cookie_consent';
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -24,7 +24,7 @@ export function CookieConsent() {
     <div className="fixed bottom-0 inset-x-0 z-50 p-4 pointer-events-none" role="alertdialog" aria-label="Cookie consent" aria-describedby="cookie-consent-desc">
       <div className="mx-auto max-w-xl pointer-events-auto rounded-lg border border-border bg-card/95 backdrop-blur-md shadow-lg p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <p id="cookie-consent-desc" className="text-sm text-muted-foreground flex-1">
-          VeloType uses local storage to keep you logged in and save your preferences. No third-party
+          VeloXType uses local storage to keep you logged in and save your preferences. No third-party
           tracking cookies are used. See our{' '}
           <a href="/privacy" className="text-primary underline">
             Privacy Policy
