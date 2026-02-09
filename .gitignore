@@ -10,7 +10,10 @@ server/dist/
 # Env
 .env
 .env.*
+!.env.example
 server/.env
+server/.env.*
+!server/.env.example
 server/data/revoked-tokens.json
 
 # Tests/coverage

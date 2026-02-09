@@ -1,0 +1,39 @@
+# Render Blueprint — deploy backend + Postgres with one click
+# Docs: https://docs.render.com/blueprint-spec
+#
+# Usage:
+#   1. Push this file to your repo
+#   2. Go to https://dashboard.render.com/blueprints → "New Blueprint Instance"
+#   3. Connect your repo and fill in env var values
+#   4. Render will provision the database and web service automatically
+
+databases:
+  - name: veloxtype-db
+    plan: free          # free | starter | standard | pro
+    databaseName: veloxtype
+    user: veloxtype
+
+services:
+  - type: web
+    name: veloxtype-api
+    runtime: node
+    plan: free          # free | starter | standard | pro
+    rootDir: server
+    buildCommand: npm install && npm run build:prod
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: veloxtype-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true   # Render generates a 64-char random string
+      - key: CORS_ORIGIN
+        sync: false            # you must set this manually (your Vercel domain)
+      - key: DAILY_RESET_TIMEZONE
+        value: America/New_York
+      - key: OAUTH_GOOGLE_CLIENT_ID
+        sync: false            # set manually if using Google OAuth
+      # PORT is auto-set by Render — do not override
