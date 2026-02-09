@@ -185,3 +185,21 @@ Features are implemented incrementally, with an emphasis on correctness, fairnes
 - [x] Accessibility and UX refinements
 - [x] Performance profiling and optimization
 - [x] Legal and privacy documentation
+
+### Phase 7 — Implement Cosmetic Customization (In Planning)
+- [ ] Set up profile and player banner, possibly skins
+- [ ] Add in game store to purchase cosmetic, some are for currency earned from playing
+- [ ] Small stuff in profile, gamer tag change option, user description
+- [ ] Add friends and multiplayer side bar and mechanic
+
+### Phase 8 — Even More Game Modes 
+- [ ] Team based Battle Royal
+- [ ] 2v2 3v3 4v4, (will be tested to see if viable)
+- [ ] Friendly game and casual gamemode
+- [ ] Other multiplayer small additions
+
+### Phase 9 — Social and Clubs
+- [ ] Adding clubs similar to squadron or clan
+- [ ] max 30 player
+- [ ] possible have added store and reward for club battles
+- [ ] more social and friend options
