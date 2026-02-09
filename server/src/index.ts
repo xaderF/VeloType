@@ -65,12 +65,42 @@ await app.register(helmet, {
   // HSTS, X-Frame-Options, X-Content-Type-Options are enabled by default
 });
 
+function normalizeOrigin(value: string) {
+  return value.trim().replace(/\/+$/, '');
+}
+
+function matchesOrigin(candidateOrigin: string, allowedOrigin: string) {
+  const normalizedCandidate = normalizeOrigin(candidateOrigin);
+  const normalizedAllowed = normalizeOrigin(allowedOrigin);
+
+  if (normalizedAllowed === '*') return true;
+  if (normalizedCandidate === normalizedAllowed) return true;
+
+  if (normalizedAllowed.includes('*')) {
+    const wildcardPattern = `^${normalizedAllowed
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\*/g, '.*')}$`;
+    return new RegExp(wildcardPattern, 'i').test(normalizedCandidate);
+  }
+
+  return false;
+}
+
 const allowedOrigins = env.CORS_ORIGIN
   ? env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
   : ['http://localhost:8080', 'http://127.0.0.1:8080']; // dev-only defaults
 
 await app.register(cors, {
-  origin: allowedOrigins,
+  origin: (origin, cb) => {
+    // Non-browser requests may not send an Origin header.
+    if (!origin) {
+      cb(null, true);
+      return;
+    }
+
+    const isAllowed = allowedOrigins.some((allowedOrigin) => matchesOrigin(origin, allowedOrigin));
+    cb(null, isAllowed);
+  },
   credentials: true,
 });
 
