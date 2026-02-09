@@ -14,7 +14,7 @@ The project is designed around ranked progression, fair match conditions, and ex
 
 ## Overview
 
-VeloXType is built as a modern, **type-safe** frontend application to explore competitive typing mechanics beyond conventional typing platforms. Instead of measuring raw speed in isolation, the game evaluates relative performance between players, emphasizing accuracy, consistency, and decision-making under pressure.
+VeloXType is built as a modern, **type-safe** web application to explore competitive typing mechanics beyond conventional typing platforms. Instead of measuring raw speed in isolation, the game evaluates relative performance between players, emphasizing accuracy, consistency, and decision-making under pressure.
 
 The codebase is intentionally structured to support scalable game modes and future real-time features while maintaining clean component boundaries and predictable, strongly-typed game logic.
 
@@ -110,9 +110,11 @@ A player reaches score `100` when both are true:
 | Category    | Tools |
 |------------|-------|
 | Frontend   | React, TypeScript, HTML5, CSS3 |
+| Backend    | Fastify, TypeScript, Prisma, WebSocket |
+| Database   | PostgreSQL |
 | Styling    | Tailwind CSS |
 | Tooling    | Vite, npm |
-| Deployment | Vercel |
+| Deployment | Vercel (frontend) + Node backend service |
 
 ---
 
@@ -121,13 +123,19 @@ A player reaches score `100` when both are true:
 ```
 root
 ├── public
+├── server
+│   ├── prisma         # Database schema + migrations
+│   ├── src            # API routes, auth, matchmaking, live match WS
+│   └── package.json
 ├── src
 │   ├── components     # Reusable UI components
 │   ├── pages          # Route-level pages
 │   ├── game           # Typing engine, scoring, and match rules
 │   ├── assets         # Static assets
-│   ├── styles         # Global and utility styles
-│   └── main.tsx       # Application entry point
+│   ├── hooks          # Auth, online match, and game state hooks
+│   ├── services       # WebSocket and API service helpers
+│   └── lib            # Shared utilities
+├── index.html
 ├── package.json
 ├── vite.config.ts
 └── README.md
