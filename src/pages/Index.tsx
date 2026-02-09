@@ -117,12 +117,11 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
           {mode === 'register' && (
             <input
               className="w-full px-3 py-2 rounded border bg-background text-foreground"
-              placeholder="Email"
+              placeholder="Email (optional)"
               aria-label="Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
             />
           )}
           <input
@@ -178,7 +177,7 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
 
           <button
             type="submit"
-            disabled={loading || (mode === 'register' && (!acceptedTerms || !ageConfirmed || !email.trim()))}
+            disabled={loading || (mode === 'register' && (!acceptedTerms || !ageConfirmed))}
             className="w-full py-2 rounded bg-primary text-primary-foreground font-semibold disabled:opacity-50"
           >
             {loading ? 'Loading...' : mode === 'login' ? 'Log In' : 'Register'}

@@ -26,7 +26,10 @@ const usernameSchema = z
 
 const registerSchema = z.object({
   username: usernameSchema,
-  email: z.string().trim().email(),
+  email: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().email().optional(),
+  ),
   password: z.string().min(8),
   rememberMe: z.boolean().optional().default(false),
   acceptedTerms: z.literal(true, {
@@ -128,18 +131,20 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const username = parsed.data.username.toLowerCase();
-    const email = normalizeEmail(parsed.data.email);
-    const emailHash = hashEmailForLookup(email);
+    const email = parsed.data.email ? normalizeEmail(parsed.data.email) : null;
+    const emailHash = email ? hashEmailForLookup(email) : null;
     const passwordHash = hashPassword(parsed.data.password);
-    const encryptedEmail = encryptPii(email);
+    const encryptedEmail = email ? encryptPii(email) : null;
 
     const existingByUsername = await db.user.findUnique({ where: { username }, select: { id: true } });
     if (existingByUsername) {
       return reply.status(409).send({ error: 'Account already exists' });
     }
-    const existingByEmail = await db.user.findUnique({ where: { emailHash }, select: { id: true } });
-    if (existingByEmail) {
-      return reply.status(409).send({ error: 'Account already exists' });
+    if (emailHash) {
+      const existingByEmail = await db.user.findUnique({ where: { emailHash }, select: { id: true } });
+      if (existingByEmail) {
+        return reply.status(409).send({ error: 'Account already exists' });
+      }
     }
 
     const created = await db.user.create({

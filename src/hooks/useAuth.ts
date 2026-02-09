@@ -106,14 +106,15 @@ export function useAuth() {
     void refreshProfile();
   }, [refreshProfile]);
 
-  const register = useCallback(async (username: string, password: string, email: string, rememberMe = false) => {
+  const register = useCallback(async (username: string, password: string, email?: string, rememberMe = false) => {
     setLoading(true);
     setError(null);
     try {
+      const normalizedEmail = email?.trim();
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, email, acceptedTerms: true, rememberMe }),
+        body: JSON.stringify({ username, password, email: normalizedEmail || undefined, acceptedTerms: true, rememberMe }),
       });
       const data = await res.json();
       if (!res.ok) {
