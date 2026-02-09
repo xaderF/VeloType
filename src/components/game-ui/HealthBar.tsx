@@ -1,7 +1,7 @@
 // HealthBar: Shows player health during the match. Used in MatchHUD.
 // Depends on: framer-motion, cn util.
 // Props: current, max, showDamage, isPlayer, className.
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +13,7 @@ interface HealthBarProps {
   className?: string;
 }
 
-export function HealthBar({ 
+export const HealthBar = memo(function HealthBar({ 
   current, 
   max, 
   showDamage, 
@@ -116,4 +116,4 @@ export function HealthBar({
       </div>
     </div>
   );
-}
+});

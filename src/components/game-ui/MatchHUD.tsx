@@ -1,6 +1,7 @@
 // MatchHUD: Main heads-up display for match info, health, and status. Uses HealthBar, RankBadge.
 // Depends on: framer-motion, HealthBar, RankBadge, Player type, cn util.
 // Props: player, opponent, currentRound.
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { HealthBar } from './HealthBar';
 import { RankBadge } from './RankBadge';
@@ -18,7 +19,7 @@ interface MatchHUDProps {
   className?: string;
 }
 
-export function MatchHUD({
+export const MatchHUD = memo(function MatchHUD({
   player,
   opponent,
   currentRound,
@@ -108,4 +109,4 @@ export function MatchHUD({
       </div>
     </div>
   );
-}
+});

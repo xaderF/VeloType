@@ -33,6 +33,8 @@ model Rating {
   competitiveElo       Int?     // null until player reaches Apex. Starts at 0 on promotion.
   rd                   Float?
   updatedAt            DateTime @updatedAt
+
+  @@index([rating(sort: Desc)])  // leaderboard ORDER BY rating DESC + rank count
 }
 
 model Match {
