@@ -1,9 +1,51 @@
 // TypingDisplay: Displays the text to be typed. Used in TypingArena.
 // Depends on: cn util.
 // Props: text, typed, currentIndex, className.
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
+// ---------------------------------------------------------------------------
+// Memoised single-character cell — only re-renders when its own state changes.
+// ---------------------------------------------------------------------------
+interface CharCellProps {
+  char: string;
+  status: 'pending' | 'correct' | 'error';
+  isCurrent: boolean;
+}
+
+const STATUS_CLASS: Record<CharCellProps['status'], string> = {
+  pending: 'text-typing-pending',
+  correct: 'text-typing-correct',
+  error: 'text-typing-error',
+};
+
+const CharCell = memo(function CharCell({ char, status, isCurrent }: CharCellProps) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (isCurrent) {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }
+  }, [isCurrent]);
+
+  return (
+    <span className="relative inline-block">
+      <span
+        ref={isCurrent ? ref : undefined}
+        className={cn(STATUS_CLASS[status], 'transition-colors duration-75')}
+      >
+        {char === ' ' ? '\u00A0' : char}
+      </span>
+      {isCurrent && (
+        <span className="typing-caret absolute left-[-0.08em] top-[0.12em] h-[1.05em] w-[2px] rounded-full bg-primary" />
+      )}
+    </span>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// TypingDisplay — the visible text the player types against.
+// ---------------------------------------------------------------------------
 interface TypingDisplayProps {
   text: string;
   typed: string;
@@ -13,58 +55,55 @@ interface TypingDisplayProps {
   className?: string;
 }
 
-export function TypingDisplay({ text, typed, currentIndex, textSize, className }: TypingDisplayProps) {
-  const words = text.split(/(\s+)/); // Split by spaces, keep spaces
-  const currentRef = useRef<HTMLSpanElement | null>(null);
+export const TypingDisplay = memo(function TypingDisplay({
+  text,
+  typed,
+  currentIndex,
+  textSize,
+  className,
+}: TypingDisplayProps) {
+  // Pre-compute a flat status array so word rendering is pure.
+  const statuses = useMemo(() => {
+    const out = new Array<CharCellProps['status']>(text.length);
+    for (let i = 0; i < text.length; i++) {
+      if (i >= typed.length) {
+        out[i] = 'pending';
+      } else if (typed[i] === text[i]) {
+        out[i] = 'correct';
+      } else {
+        out[i] = 'error';
+      }
+    }
+    return out;
+  }, [text, typed]);
 
-  useEffect(() => {
-    currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-  }, [currentIndex]);
+  // Split into words once (text never changes mid-render).
+  const words = useMemo(() => text.split(/(\s+)/), [text]);
 
-  // Track character index for cursor
   let charIndex = 0;
 
   return (
     <div
       className={cn(
-        "relative font-mono leading-relaxed select-none break-words whitespace-pre-wrap overflow-hidden",
-        textSize ?? "text-2xl md:text-3xl",
-        className
+        'relative font-mono leading-relaxed select-none break-words whitespace-pre-wrap overflow-hidden',
+        textSize ?? 'text-2xl md:text-3xl',
+        className,
       )}
     >
       {words.map((word, wIdx) => {
-        // Render each word as a span, then each char inside
+        const startIdx = charIndex;
+        charIndex += word.length;
         return (
           <span key={wIdx} className="inline-block">
             {word.split('').map((char, cIdx) => {
-              const index = charIndex;
-              const typedChar = typed[index];
-              const hasTyped = index < typed.length;
-              const isCurrentChar = index === currentIndex;
-
-              let charClass = 'text-typing-pending';
-              if (hasTyped && typedChar === char) {
-                charClass = 'text-typing-correct';
-              } else if (hasTyped && typedChar !== char) {
-                charClass = 'text-typing-error';
-              }
-
-              charIndex++;
-
+              const idx = startIdx + cIdx;
               return (
-                <span key={cIdx} className="relative inline-block">
-                  <span
-                    ref={isCurrentChar ? currentRef : null}
-                    className={cn(charClass, "transition-colors duration-75")}
-                  >
-                    {char === ' ' ? '\u00A0' : char}
-                  </span>
-                  {isCurrentChar && (
-                    <span
-                      className="typing-caret absolute left-[-0.08em] top-[0.12em] h-[1.05em] w-[2px] rounded-full bg-primary"
-                    />
-                  )}
-                </span>
+                <CharCell
+                  key={cIdx}
+                  char={char}
+                  status={statuses[idx]}
+                  isCurrent={idx === currentIndex}
+                />
               );
             })}
           </span>
@@ -72,4 +111,4 @@ export function TypingDisplay({ text, typed, currentIndex, textSize, className }
       })}
     </div>
   );
-}
+});

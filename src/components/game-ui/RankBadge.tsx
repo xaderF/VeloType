@@ -1,5 +1,6 @@
 // RankBadge: Displays player rank badge with tier (e.g. "Silver 3").
 // Apex/Paragon show raw ELO. Unranked (null rating) shows nothing.
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { getRankWithLeaderboard, getRankTierName, Rank } from '@/utils/scoring';
@@ -24,7 +25,7 @@ const rankIcons: Record<Rank, string> = {
   paragon: '🏆',
 };
 
-export function RankBadge({ rating, leaderboardPosition, competitiveElo, size = 'md', className }: RankBadgeProps) {
+export const RankBadge = memo(function RankBadge({ rating, leaderboardPosition, competitiveElo, size = 'md', className }: RankBadgeProps) {
   const sizeClasses = {
     sm: 'text-xs px-2 py-0.5',
     md: 'text-sm px-3 py-1',
@@ -68,4 +69,4 @@ export function RankBadge({ rating, leaderboardPosition, competitiveElo, size = 
       <span>{tierName}</span>
     </motion.div>
   );
-}
+});

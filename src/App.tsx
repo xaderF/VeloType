@@ -1,17 +1,46 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Profile from "./pages/Profile";
-import { MatchHistoryList, MatchDetailView } from "./pages/MatchHistory";
-import DailyChallenge from "./pages/DailyChallenge";
-import Leaderboard from "./pages/Leaderboard";
 
-const queryClient = new QueryClient();
+// ---------------------------------------------------------------------------
+// Route-level code splitting — each page is loaded on demand
+// ---------------------------------------------------------------------------
+const Index = lazy(() => import("./pages/Index"));
+const Profile = lazy(() => import("./pages/Profile"));
+const MatchHistoryList = lazy(() =>
+  import("./pages/MatchHistory").then((m) => ({ default: m.MatchHistoryList }))
+);
+const MatchDetailView = lazy(() =>
+  import("./pages/MatchHistory").then((m) => ({ default: m.MatchDetailView }))
+);
+const DailyChallenge = lazy(() => import("./pages/DailyChallenge"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,   // 2 minutes — avoid aggressive refetching
+      gcTime: 1000 * 60 * 10,     // 10 minutes garbage-collection window
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+function PageLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="animate-pulse text-sm text-muted-foreground">Loading…</div>
+    </div>
+  );
+}
 
 const App = () => (
   <ErrorBoundary>
@@ -20,16 +49,20 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/history" element={<MatchHistoryList />} />
-            <Route path="/history/:matchId" element={<MatchDetailView />} />
-            <Route path="/daily" element={<DailyChallenge />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/history" element={<MatchHistoryList />} />
+              <Route path="/history/:matchId" element={<MatchDetailView />} />
+              <Route path="/daily" element={<DailyChallenge />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

@@ -62,6 +62,7 @@ export async function profileRoutes(app: FastifyInstance) {
 
   // -------------------------------------------------------------------------
   // GET /profile/stats — aggregate match stats for the authenticated user
+  // Uses DB-level aggregation instead of loading all rows into JS.
   // -------------------------------------------------------------------------
   app.get('/profile/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     const token = getBearerToken(request.headers.authorization);
@@ -70,39 +71,46 @@ export async function profileRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
 
-    const matchPlayers = await db.matchPlayer.findMany({
-      where: { userId: authUser.id, result: { not: null } },
-      select: {
-        wpm: true,
-        accuracy: true,
-        consistency: true,
-        result: true,
-        ratingDelta: true,
-        match: { select: { createdAt: true } },
-      },
-      orderBy: { match: { createdAt: 'desc' } },
-    });
+    // Run aggregate + groupBy + recent-20 in parallel
+    const [aggregates, resultCounts, recentMatches] = await Promise.all([
+      // 1) Averages & max in one DB pass
+      db.matchPlayer.aggregate({
+        where: { userId: authUser.id, result: { not: null } },
+        _count: { _all: true },
+        _avg: { wpm: true, accuracy: true, consistency: true },
+        _max: { wpm: true },
+      }),
+      // 2) Win/loss/draw counts via groupBy
+      db.matchPlayer.groupBy({
+        by: ['result'],
+        where: { userId: authUser.id, result: { not: null } },
+        _count: { _all: true },
+      }),
+      // 3) Only the 20 most-recent matches for the sparkline
+      db.matchPlayer.findMany({
+        where: { userId: authUser.id, result: { not: null }, ratingDelta: { not: null } },
+        select: {
+          ratingDelta: true,
+          match: { select: { createdAt: true } },
+        },
+        orderBy: { match: { createdAt: 'desc' } },
+        take: 20,
+      }),
+    ]);
 
-    const total = matchPlayers.length;
-    const wins = matchPlayers.filter((m) => m.result === 'win').length;
-    const losses = matchPlayers.filter((m) => m.result === 'loss').length;
-    const draws = matchPlayers.filter((m) => m.result === 'draw').length;
+    const total = aggregates._count._all;
+    const countMap = Object.fromEntries(
+      resultCounts.map((r) => [r.result, r._count._all]),
+    );
+    const wins = countMap['win'] ?? 0;
+    const losses = countMap['loss'] ?? 0;
+    const draws = countMap['draw'] ?? 0;
 
-    const wpms = matchPlayers.filter((m) => m.wpm != null).map((m) => m.wpm!);
-    const accs = matchPlayers.filter((m) => m.accuracy != null).map((m) => m.accuracy!);
-    const conss = matchPlayers.filter((m) => m.consistency != null).map((m) => m.consistency!);
+    const round = (v: number | null, decimals: number) =>
+      v != null ? Math.round(v * 10 ** decimals) / 10 ** decimals : 0;
 
-    const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
-    const best = (arr: number[]) => (arr.length ? Math.max(...arr) : 0);
-
-    // Recent 20 matches for sparkline / rating graph
-    const recentRatings = matchPlayers
-      .slice(0, 20)
-      .filter((m) => m.ratingDelta != null)
-      .map((m) => ({
-        delta: m.ratingDelta!,
-        date: m.match.createdAt,
-      }))
+    const recentRatings = recentMatches
+      .map((m) => ({ delta: m.ratingDelta!, date: m.match.createdAt }))
       .reverse(); // oldest first for graph
 
     return {
@@ -111,10 +119,10 @@ export async function profileRoutes(app: FastifyInstance) {
       losses,
       draws,
       winRate: total > 0 ? Math.round((wins / total) * 1000) / 10 : 0,
-      avgWpm: Math.round(avg(wpms) * 100) / 100,
-      bestWpm: Math.round(best(wpms) * 100) / 100,
-      avgAccuracy: Math.round(avg(accs) * 10000) / 10000,
-      avgConsistency: Math.round(avg(conss) * 10000) / 10000,
+      avgWpm: round(aggregates._avg.wpm, 2),
+      bestWpm: round(aggregates._max.wpm, 2),
+      avgAccuracy: round(aggregates._avg.accuracy, 4),
+      avgConsistency: round(aggregates._avg.consistency, 4),
       recentRatings,
     };
   });

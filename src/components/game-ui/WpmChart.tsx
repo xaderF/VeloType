@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -49,7 +50,7 @@ function CustomTooltip({
   );
 }
 
-export function WpmChart({ data, className }: WpmChartProps) {
+export const WpmChart = memo(function WpmChart({ data, className }: WpmChartProps) {
   if (!data.length) return null;
 
   const maxWpm = Math.max(...data.map((d) => Math.max(d.wpm, d.raw)), 10);
@@ -121,4 +122,4 @@ export function WpmChart({ data, className }: WpmChartProps) {
       </ResponsiveContainer>
     </div>
   );
-}
+});
