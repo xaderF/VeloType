@@ -1,5 +1,7 @@
 # VeloXType
 
+🌐 **Play here:** https://veloxtype.vercel.app
+
 <p align="left">
   <img alt="React" height="24" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" />
   <img alt="TypeScript" height="24" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" />
