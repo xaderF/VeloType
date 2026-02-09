@@ -296,7 +296,7 @@ export function LetterParticles() {
     window.addEventListener('resize', resize);
 
     // Seed
-    const rand = mulberry32(hashSeed('velotype-lobby-background'));
+    const rand = mulberry32(hashSeed('veloxtype-lobby-background'));
     particles.current = Array.from({ length: PARTICLE_COUNT }, () =>
       createParticle(window.innerWidth, window.innerHeight, rand, true),
     );

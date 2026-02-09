@@ -1,4 +1,4 @@
-# VeloType Server (Phase 2 foundation)
+# VeloXType Server (Phase 2 foundation)
 
 ## Setup
 

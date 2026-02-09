@@ -184,7 +184,7 @@ export function HomeScreen({
         >
           {/* Logo */}
           <h1 className="text-5xl md:text-7xl font-bold tracking-[0.25em] uppercase text-lobby-text">
-            <span className="text-accent">VELO</span>TYPE
+            <span className="text-accent">VELOX</span>TYPE
           </h1>
 
           {/* Tagline */}

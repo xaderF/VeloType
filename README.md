@@ -1,4 +1,4 @@
-# VeloType
+# VeloXType
 
 <p align="left">
   <img alt="React" height="24" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" />
@@ -7,14 +7,14 @@
   <img alt="Vite" height="24" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" />
 </p>
 
-VeloType is a competitive typing game that transforms typing speed, accuracy, and consistency into structured, skill-based competition.  
+VeloXType is a competitive typing game that transforms typing speed, accuracy, and consistency into structured, skill-based competition.  
 The project is designed around ranked progression, fair match conditions, and extensible game modes rather than traditional standalone typing tests.
 
 ---
 
 ## Overview
 
-VeloType is built as a modern, **type-safe** frontend application to explore competitive typing mechanics beyond conventional typing platforms. Instead of measuring raw speed in isolation, the game evaluates relative performance between players, emphasizing accuracy, consistency, and decision-making under pressure.
+VeloXType is built as a modern, **type-safe** frontend application to explore competitive typing mechanics beyond conventional typing platforms. Instead of measuring raw speed in isolation, the game evaluates relative performance between players, emphasizing accuracy, consistency, and decision-making under pressure.
 
 The codebase is intentionally structured to support scalable game modes and future real-time features while maintaining clean component boundaries and predictable, strongly-typed game logic.
 
@@ -42,7 +42,7 @@ A head-to-head competitive mode where two players type the same text under ident
 - Health / damage mechanics derived from typing accuracy and speed  
 - Designed for ranked matchmaking and progression  
 
-This mode forms the competitive core of VeloType.
+This mode forms the competitive core of VeloXType.
 
 ---
 
@@ -66,7 +66,7 @@ A multi-player competitive mode built on the same core scoring system.
 
 ---
 
-## What Makes VeloType Different
+## What Makes VeloXType Different
 
 - **Competitive-first design** — built around player interaction rather than solo benchmarks  
 - **Fair by construction** — deterministic text generation removes randomness  
@@ -136,7 +136,7 @@ root
 
 ## Roadmap
 
-The following roadmap outlines planned milestones for VeloType.  
+The following roadmap outlines planned milestones for VeloXType.  
 Features are implemented incrementally, with an emphasis on correctness, fairness, and scalability.
 
 ### Phase 1 — Core Foundation

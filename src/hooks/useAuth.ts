@@ -3,9 +3,9 @@
 import { useState, useCallback, useEffect } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
-const TOKEN_KEY = 'velotype_auth_token';
-const USER_KEY = 'velotype_auth_user';
-const STORAGE_MODE_KEY = 'velotype_auth_storage_mode';
+const TOKEN_KEY = 'veloxtype_auth_token';
+const USER_KEY = 'veloxtype_auth_user';
+const STORAGE_MODE_KEY = 'veloxtype_auth_storage_mode';
 
 export interface AuthUser {
   id: string;
@@ -210,7 +210,7 @@ export function useAuth() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `velotype-data-export.json`;
+      a.download = `veloxtype-data-export.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();

@@ -244,7 +244,7 @@ const PII_PREFIX = 'enc:';
 function getPiiKey(): Buffer | null {
   const raw = env.PII_ENCRYPTION_KEY ?? env.AUTH_SECRET;
   // Derive a 32-byte key from whatever was provided
-  return scryptSync(raw, 'velotype-pii-salt', 32);
+  return scryptSync(raw, 'veloxtype-pii-salt', 32);
 }
 
 export function encryptPii(plaintext: string): string {

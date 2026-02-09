@@ -276,7 +276,7 @@ export async function profileRoutes(app: FastifyInstance) {
       })),
     };
 
-    reply.header('Content-Disposition', `attachment; filename="velotype-data-export-${authUser.id}.json"`);
+    reply.header('Content-Disposition', `attachment; filename="veloxtype-data-export-${authUser.id}.json"`);
     reply.header('Content-Type', 'application/json');
     return exportData;
   });

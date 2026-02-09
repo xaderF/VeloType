@@ -526,7 +526,7 @@ const Index = () => {
   const [showOnlineRoundEndForfeitDialog, setShowOnlineRoundEndForfeitDialog] = useState(false);
   const [showFps, setShowFps] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem('velotype:show-fps') === '1';
+      return window.localStorage.getItem('veloxtype:show-fps') === '1';
     } catch {
       return false;
     }
@@ -574,7 +574,7 @@ const Index = () => {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('velotype:show-fps', showFps ? '1' : '0');
+      window.localStorage.setItem('veloxtype:show-fps', showFps ? '1' : '0');
     } catch {
       // Ignore storage failures (private mode, quota limits, etc.)
     }

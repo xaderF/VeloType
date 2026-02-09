@@ -51,7 +51,7 @@ function getNextResetAt(at: Date = new Date()): string {
 }
 
 function getDailySeed(date: string): string {
-  return `velotype-daily-${date}`;
+  return `veloxtype-daily-${date}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -7,13 +7,13 @@ export default function TermsOfService() {
       <section className="space-y-4 text-sm leading-relaxed text-muted-foreground">
         <h2 className="text-lg font-semibold text-foreground">1. Acceptance of Terms</h2>
         <p>
-          By accessing or using VeloType ("the Service"), you agree to be bound by these Terms of
+          By accessing or using VeloXType ("the Service"), you agree to be bound by these Terms of
           Service. If you do not agree, please do not use the Service.
         </p>
 
         <h2 className="text-lg font-semibold text-foreground">2. Eligibility &amp; Age Requirements</h2>
         <p>
-          You must be at least 13&nbsp;years of age to create an account and use VeloType. By
+          You must be at least 13&nbsp;years of age to create an account and use VeloXType. By
           registering, you confirm that you are at least 13&nbsp;years old. If you are between
           13&nbsp;and 18&nbsp;years of age (or the age of majority in your jurisdiction), you must have
           parental or guardian consent to use the Service. We do not knowingly collect personal data from
@@ -23,7 +23,7 @@ export default function TermsOfService() {
 
         <h2 className="text-lg font-semibold text-foreground">3. Description of Service</h2>
         <p>
-          VeloType is an online competitive typing game that allows users to practice typing, compete
+          VeloXType is an online competitive typing game that allows users to practice typing, compete
           in ranked matches, participate in daily challenges, and view leaderboards.
         </p>
 
@@ -54,7 +54,7 @@ export default function TermsOfService() {
 
         <h2 className="text-lg font-semibold text-foreground">7. Intellectual Property</h2>
         <p>
-          The VeloType source code is available under the MIT License. However, the Service (including
+          The VeloXType source code is available under the MIT License. However, the Service (including
           its design, branding, and user-generated data) remains the property of its operators.
         </p>
 
@@ -75,7 +75,7 @@ export default function TermsOfService() {
 
         <h2 className="text-lg font-semibold text-foreground">10. Limitation of Liability</h2>
         <p>
-          In no event shall VeloType or its operators be liable for any indirect, incidental, special,
+          In no event shall VeloXType or its operators be liable for any indirect, incidental, special,
           consequential, or punitive damages arising out of or relating to your use of the Service.
         </p>
 
@@ -98,8 +98,8 @@ export default function TermsOfService() {
         <h2 className="text-lg font-semibold text-foreground">13. Contact</h2>
         <p>
           Questions about these Terms? Contact us at{' '}
-          <a href="mailto:legal@velotype.dev" className="text-primary underline">
-            legal@velotype.dev
+          <a href="mailto:legal@veloxtype.dev" className="text-primary underline">
+            legal@veloxtype.dev
           </a>
           .
         </p>
@@ -107,7 +107,7 @@ export default function TermsOfService() {
 
       <div className="mt-12 text-center">
         <a href="/" className="text-sm text-primary underline">
-          ← Back to VeloType
+          ← Back to VeloXType
         </a>
       </div>
     </div>

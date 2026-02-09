@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://velotype.dev/sitemap.xml
+Sitemap: https://veloxtype.dev/sitemap.xml
 
 # Add common bots for completeness
 User-agent: Googlebot
