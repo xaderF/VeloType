@@ -4,6 +4,7 @@ import type { RawData } from 'ws';
 import { z } from 'zod';
 import { getBearerToken, verifyAuthToken } from '../auth.js';
 import { prisma } from '../db.js';
+import { wsRateLimitAllow } from './ws-rate-limit.js';
 
 // Module-level logger — initialised when the plugin registers
 let log: FastifyBaseLogger;
@@ -962,6 +963,12 @@ export async function liveMatchWs(app: FastifyInstance) {
     send(socket, { type: 'welcome', message: 'live match connected' });
 
     socket.on('message', (data: RawData) => {
+      // Per-connection rate limit: 30 burst, 10/sec refill
+      if (!wsRateLimitAllow(socket)) {
+        send(socket, { type: 'error', message: 'rate limited — slow down' });
+        return;
+      }
+
       void (async () => {
         let parsed: unknown;
         try {

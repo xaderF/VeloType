@@ -5,6 +5,7 @@ import type { RawData } from 'ws';
 import { prisma } from '../db.js';
 import { verifyAuthToken } from '../auth.js';
 import { activeMatchConfigs } from './live-match.js';
+import { wsRateLimitAllow } from './ws-rate-limit.js';
 import { calculatePlacementProgressRating, type PlacementGameResult } from '../placement.js';
 
 // Module-level logger — initialised when the plugin registers
@@ -308,6 +309,12 @@ export async function matchmakingWs(app: FastifyInstance) {
     socket.send(JSON.stringify({ type: 'welcome', message: 'matchmaking connected' }));
 
     socket.on('message', (data: RawData) => {
+      // Per-connection rate limit: 30 burst, 10/sec refill
+      if (!wsRateLimitAllow(socket)) {
+        socket.send(JSON.stringify({ type: 'error', message: 'rate limited — slow down' }));
+        return;
+      }
+
       let parsed: unknown;
       try {
         parsed = JSON.parse(data.toString());

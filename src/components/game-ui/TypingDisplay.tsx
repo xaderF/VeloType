@@ -89,6 +89,9 @@ export const TypingDisplay = memo(function TypingDisplay({
         textSize ?? 'text-2xl md:text-3xl',
         className,
       )}
+      role="application"
+      aria-label="Typing area — type the displayed text"
+      aria-roledescription="typing test"
     >
       {words.map((word, wIdx) => {
         const startIdx = charIndex;

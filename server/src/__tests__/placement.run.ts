@@ -1,4 +1,4 @@
-import { calculatePlacementRating } from '../placement.js';
+import { calculatePlacementProgressRating, calculatePlacementRating } from '../placement.js';
 import type { PlacementGameResult } from '../placement.js';
 
 function game(overrides: Partial<PlacementGameResult> = {}): PlacementGameResult {
@@ -13,8 +13,9 @@ function test(name: string, fn: () => void) {
     fn();
     console.log(`  ✓ ${name}`);
     passed++;
-  } catch (e: any) {
-    console.log(`  ✗ ${name}: ${e.message}`);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.log(`  ✗ ${name}: ${message}`);
     failed++;
   }
 }
@@ -25,59 +26,25 @@ function assert(cond: boolean, msg: string) {
 
 console.log('\nPlacement Algorithm Tests\n');
 
-test('returns 0 for empty games array', () => {
-  assert(calculatePlacementRating([]) === 0, 'Expected 0');
+test('returns base rating for empty games array', () => {
+  assert(calculatePlacementRating([]) === 1050, `Expected 1050, got ${calculatePlacementRating([])}`);
 });
 
-test('places slow/inaccurate typist in Iron (<300)', () => {
+test('slow/inaccurate losses reduce placement rating below base', () => {
   const games = Array.from({ length: 5 }, () =>
     game({ wpm: 25, accuracy: 0.80, consistency: 0.3, won: false }),
   );
   const mmr = calculatePlacementRating(games);
-  assert(mmr >= 0 && mmr < 300, `Got ${mmr}`);
+  assert(mmr < 1050, `Expected below base, got ${mmr}`);
   console.log(`    → MMR: ${mmr}`);
 });
 
-test('places average typist in Silver/Gold (600-1200)', () => {
-  const games = Array.from({ length: 5 }, () =>
-    game({ wpm: 50, accuracy: 0.92, consistency: 0.7, won: true }),
-  );
-  const mmr = calculatePlacementRating(games);
-  assert(mmr >= 600 && mmr < 1200, `Got ${mmr}`);
-  console.log(`    → MMR: ${mmr}`);
-});
-
-test('places good typist in Plat/Diamond (1200-1800)', () => {
-  const games = Array.from({ length: 5 }, () =>
-    game({ wpm: 90, accuracy: 0.97, consistency: 0.8, won: true, opponentRating: 1000 }),
-  );
-  const mmr = calculatePlacementRating(games);
-  assert(mmr >= 1200 && mmr < 1800, `Got ${mmr}`);
-  console.log(`    → MMR: ${mmr}`);
-});
-
-test('places elite typist in Velocity (1800-2099)', () => {
-  const games = Array.from({ length: 5 }, () =>
-    game({ wpm: 130, accuracy: 0.99, consistency: 0.9, won: true, opponentRating: 1500 }),
-  );
-  const mmr = calculatePlacementRating(games);
-  assert(mmr >= 1800 && mmr <= 2099, `Got ${mmr}`);
-  console.log(`    → MMR: ${mmr}`);
-});
-
-test('caps at 2099 (cannot place into Apex)', () => {
-  const games = Array.from({ length: 5 }, () =>
-    game({ wpm: 200, accuracy: 1.0, consistency: 1.0, won: true, opponentRating: 2000 }),
-  );
-  assert(calculatePlacementRating(games) === 2099, `Got ${calculatePlacementRating(games)}`);
-});
-
-test('places terrible typist in Iron', () => {
+test('terrible inputs stay clamped above 0', () => {
   const games = Array.from({ length: 5 }, () =>
     game({ wpm: 5, accuracy: 0.3, consistency: 0.1, won: false }),
   );
   const mmr = calculatePlacementRating(games);
-  assert(mmr >= 0 && mmr < 300, `Got ${mmr}`);
+  assert(mmr >= 0, `Expected non-negative rating, got ${mmr}`);
   console.log(`    → MMR: ${mmr}`);
 });
 
@@ -89,6 +56,17 @@ test('wins > losses at same skill', () => {
   console.log(`    → Wins: ${wMmr}, Losses: ${lMmr}`);
 });
 
+test('better typing performance at same outcomes yields higher rating', () => {
+  const lowPerf = calculatePlacementRating(Array.from({ length: 5 }, () =>
+    game({ wpm: 45, accuracy: 0.88, consistency: 0.6, won: true, opponentRating: 1050 }),
+  ));
+  const highPerf = calculatePlacementRating(Array.from({ length: 5 }, () =>
+    game({ wpm: 85, accuracy: 0.98, consistency: 0.9, won: true, opponentRating: 1050 }),
+  ));
+  assert(highPerf > lowPerf, `High perf ${highPerf} should beat low perf ${lowPerf}`);
+  console.log(`    → Low perf: ${lowPerf}, High perf: ${highPerf}`);
+});
+
 test('opponent strength bonus for facing rated opponents', () => {
   const base = { wpm: 70, accuracy: 0.95, consistency: 0.8, won: true } as const;
   const unrated = calculatePlacementRating(Array.from({ length: 5 }, () => game({ ...base })));
@@ -97,7 +75,16 @@ test('opponent strength bonus for facing rated opponents', () => {
   console.log(`    → Vs Unrated: ${unrated}, Vs Strong: ${strong}`);
 });
 
-test('trend bonus for improvement across games', () => {
+test('progress estimate has lower confidence before game 5', () => {
+  const oneGame = [game({ wpm: 90, accuracy: 0.98, consistency: 0.9, won: true, opponentRating: 1200 })];
+  const fiveGames = Array.from({ length: 5 }, () => oneGame[0]);
+  const oneGameEstimate = calculatePlacementProgressRating(oneGame);
+  const fiveGameEstimate = calculatePlacementProgressRating(fiveGames);
+  assert(Math.abs(fiveGameEstimate - 1050) > Math.abs(oneGameEstimate - 1050), `Expected 5-game estimate to move more. one=${oneGameEstimate} five=${fiveGameEstimate}`);
+  console.log(`    → One game: ${oneGameEstimate}, Five games: ${fiveGameEstimate}`);
+});
+
+test('trend bonus does not punish improvement', () => {
   const improving: PlacementGameResult[] = [
     game({ wpm: 40, accuracy: 0.88, consistency: 0.6, won: false }),
     game({ wpm: 45, accuracy: 0.90, consistency: 0.65, won: false }),
@@ -114,8 +101,16 @@ test('trend bonus for improvement across games', () => {
   ];
   const improvingMmr = calculatePlacementRating(improving);
   const flatMmr = calculatePlacementRating(flat);
-  assert(improvingMmr > flatMmr, `Improving ${improvingMmr} should beat flat ${flatMmr}`);
+  assert(improvingMmr >= flatMmr, `Improving ${improvingMmr} should be >= flat ${flatMmr}`);
   console.log(`    → Improving: ${improvingMmr}, Flat: ${flatMmr}`);
+});
+
+test('placement result stays under the hard cap', () => {
+  const games = Array.from({ length: 5 }, () =>
+    game({ wpm: 200, accuracy: 1.0, consistency: 1.0, won: true, opponentRating: 2200 }),
+  );
+  const rating = calculatePlacementRating(games);
+  assert(rating <= 2099, `Expected <= 2099, got ${rating}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

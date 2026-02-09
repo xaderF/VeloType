@@ -226,7 +226,7 @@ export function HomeScreen({
                 onClick={onLogin}
                 className="text-xs text-accent hover:underline underline-offset-2 transition-colors"
               >
-                Sign in to save progress
+                Sign in
               </button>
             </>
           ) : (
@@ -246,7 +246,7 @@ export function HomeScreen({
                 onClick={onLogout}
                 className="text-[10px] text-lobby-text-muted/50 hover:text-lobby-text-muted transition-colors mt-1"
               >
-                sign out
+                Sign out
               </button>
             </>
           )}

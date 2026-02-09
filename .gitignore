@@ -11,6 +11,7 @@ server/dist/
 .env
 .env.*
 server/.env
+server/data/revoked-tokens.json
 
 # Tests/coverage
 coverage/

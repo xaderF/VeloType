@@ -44,7 +44,14 @@ export const HealthBar = memo(function HealthBar({
   };
 
   return (
-    <div className={cn("relative", className)}>
+    <div
+      className={cn("relative", className)}
+      role="progressbar"
+      aria-valuenow={current}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-label={isPlayer ? "Player health" : "Opponent health"}
+    >
       {/* HP Label */}
       <div className={cn(
         "flex items-center gap-2 mb-1",

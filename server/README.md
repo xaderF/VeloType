@@ -13,7 +13,9 @@ npm install
 - Used vars:
   - `PORT` (default 4000)
   - `DATABASE_URL` (Postgres)
-  - `AUTH_SECRET` (optional now)
+  - `AUTH_SECRET` (required, min 32 chars)
+  - `CORS_ORIGIN` (required in production; comma-separated allowed origins)
+  - `OAUTH_GOOGLE_CLIENT_ID` (required in production if Google OAuth is enabled)
   - `DAILY_RESET_TIMEZONE` (IANA tz for daily challenge rollover, default `America/New_York`)
 
 3) Run
@@ -42,7 +44,7 @@ npm run dev
 - Server uses Fastify + @fastify/websocket.
 - `env.ts` validates env vars with zod.
 - Matchmaking pairs by rating, widening search range over time; sends `MATCH_FOUND` with matchId, seed, config, startAt.
-- Auth uses signed bearer tokens with `AUTH_SECRET` (falls back to a dev-only secret if unset).
+- Auth uses signed bearer tokens with `AUTH_SECRET` (no fallback secret).
 - If `DATABASE_URL` is set and migrations are applied, user/profile/match data is persisted via Prisma.
 
 ## Round Score / Damage Reference

@@ -1,11 +1,8 @@
 User-agent: *
 Allow: /
+Disallow: /api/
 
-# Extra: Encourage indexing
-Sitemap: https://yourdomain.com/sitemap.xml
-
-# Remove crawl delays and restrictions
-# No Disallow rules
+Sitemap: https://velotype.dev/sitemap.xml
 
 # Add common bots for completeness
 User-agent: Googlebot
