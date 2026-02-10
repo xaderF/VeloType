@@ -23,6 +23,7 @@ const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const APP_VERSION = "v1.1";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +66,12 @@ const App = () => (
             </Routes>
           </Suspense>
           <CookieConsent />
+          <div
+            aria-label="app-version"
+            className="pointer-events-none fixed bottom-3 right-3 z-[100] select-none text-xs font-mono text-muted-foreground/75"
+          >
+            {APP_VERSION}
+          </div>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
