@@ -3,10 +3,14 @@ import { cn } from '@/lib/utils';
 const TIME_OPTIONS = [15, 30, 60, 120] as const;
 
 interface TypingOptionsBarProps {
+  wordsEnabled?: boolean;
   punctuationEnabled: boolean;
+  numbersEnabled?: boolean;
   timeLimit: number;
   allowEndless?: boolean;
+  onToggleWords?: () => void;
   onTogglePunctuation?: () => void;
+  onToggleNumbers?: () => void;
   onTimeLimitChange?: (seconds: number) => void;
   className?: string;
 }
@@ -22,14 +26,21 @@ function getButtonClass(active: boolean, interactive: boolean) {
 }
 
 export function TypingOptionsBar({
+  wordsEnabled = true,
   punctuationEnabled,
+  numbersEnabled = false,
   timeLimit,
   allowEndless = false,
+  onToggleWords,
   onTogglePunctuation,
+  onToggleNumbers,
   onTimeLimitChange,
   className,
 }: TypingOptionsBarProps) {
+  const canToggleWords = typeof onToggleWords === 'function';
   const canTogglePunctuation = typeof onTogglePunctuation === 'function';
+  const canToggleNumbers = typeof onToggleNumbers === 'function';
+  const showNumbersToggle = canToggleNumbers || numbersEnabled;
   const canChangeTime = typeof onTimeLimitChange === 'function';
 
   return (
@@ -42,8 +53,12 @@ export function TypingOptionsBar({
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
         <button
           type="button"
-          disabled
-          className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-wide text-primary md:text-sm"
+          onClick={onToggleWords}
+          disabled={!canToggleWords}
+          className={cn(
+            'rounded-md px-3 py-1 text-xs font-medium transition-colors md:text-sm',
+            getButtonClass(wordsEnabled, canToggleWords),
+          )}
         >
           words
         </button>
@@ -61,6 +76,20 @@ export function TypingOptionsBar({
         >
           punctuation
         </button>
+
+        {showNumbersToggle && (
+          <button
+            type="button"
+            onClick={onToggleNumbers}
+            disabled={!canToggleNumbers}
+            className={cn(
+              'rounded-md px-3 py-1 text-xs font-medium transition-colors md:text-sm',
+              getButtonClass(numbersEnabled, canToggleNumbers),
+            )}
+          >
+            numbers
+          </button>
+        )}
 
         <span className="hidden h-5 w-px bg-border/70 md:block" />
 

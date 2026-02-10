@@ -22,7 +22,7 @@ type QueueEntry = {
 
 const queue: QueueEntry[] = [];
 const MATCH_INTERVAL_MS = 1000;
-const MIN_QUEUE_WAIT_MS = 5000;
+const MIN_QUEUE_WAIT_MS = 0;
 let matcherInterval: ReturnType<typeof setInterval> | null = null;
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ function removeFromQueue(socket: WebSocket) {
 }
 
 function calculateRange(joinedAt: number) {
-  const base = 100;
+  const base = 300;
   const increment = 25;
   const secondsWaiting = Math.floor((Date.now() - joinedAt) / 1000);
   const steps = Math.floor(secondsWaiting / 10);
@@ -138,9 +138,7 @@ function tryMatchOnce() {
     const a = queue[i];
     if (Date.now() - a.joinedAt < MIN_QUEUE_WAIT_MS) continue;
     const range = calculateRange(a.joinedAt);
-    // Unranked players use a default MMR for matchmaking purposes
     const aRating = a.matchmakingRating;
-    const aRankInfo = getRankInfo(aRating);
     // Find closest opponent within allowed matchmaking rules
     let candidateIndex = -1;
     let bestDelta = Number.MAX_SAFE_INTEGER;
@@ -150,32 +148,10 @@ function tryMatchOnce() {
       if (Date.now() - b.joinedAt < MIN_QUEUE_WAIT_MS) continue;
       const bRating = b.matchmakingRating;
       const delta = Math.abs(aRating - bRating);
-      const bRankInfo = getRankInfo(bRating);
 
-      const aNum = rankToNumeric(aRankInfo.rank, aRankInfo.subrank ?? 1);
-      const bNum = rankToNumeric(bRankInfo.rank, bRankInfo.subrank ?? 1);
-      const maxDiff = 3; // 3 subranks (one full rank)
-      const spread = Math.abs(aNum - bNum);
-
-      let allowed = false;
-      // Iron–Velocity (tiered ranks): max spread of 3 subranks
-      if (aNum < 21 && bNum < 21) {
-        allowed = spread <= maxDiff;
-      } else if (aRankInfo.rank === 'Velocity' || bRankInfo.rank === 'Velocity') {
-        // Velocity (with subranks): Velocity <-> Velocity/Apex (not Paragon), spread <= 3
-        const inBand = (aRankInfo.rank === 'Velocity' || aRankInfo.rank === 'Apex') && (bRankInfo.rank === 'Velocity' || bRankInfo.rank === 'Apex');
-        allowed = inBand && spread <= maxDiff;
-      } else if (aRankInfo.rank === 'Apex' || bRankInfo.rank === 'Apex') {
-        // Apex: Apex <-> Apex/Velocity/Paragon (no restriction vs Paragon)
-        allowed = (aRankInfo.rank === 'Apex' || aRankInfo.rank === 'Velocity' || aRankInfo.rank === 'Paragon')
-          && (bRankInfo.rank === 'Apex' || bRankInfo.rank === 'Velocity' || bRankInfo.rank === 'Paragon')
-          && spread <= maxDiff;
-      } else if (aRankInfo.rank === 'Paragon' || bRankInfo.rank === 'Paragon') {
-        // Paragon: Paragon <-> Paragon/Apex (not Velocity)
-        allowed = (aRankInfo.rank === 'Paragon' || aRankInfo.rank === 'Apex') && (bRankInfo.rank === 'Paragon' || bRankInfo.rank === 'Apex') && spread <= maxDiff;
-      }
-
-      if (delta <= range && delta < bestDelta && allowed) {
+      // Primary gate is dynamic MMR range; this prevents "same-time, in-range"
+      // players from being blocked by secondary rank-band rules.
+      if (delta <= range && delta < bestDelta) {
         candidateIndex = j;
         bestDelta = delta;
       }
@@ -222,7 +198,7 @@ async function createMatch(a: QueueEntry, b: QueueEntry) {
     difficulty: 'medium' as const,
     length: 10000,
     includePunctuation: false,
-    maxRounds: 5,
+    maxRounds: 6,
     prepSeconds: PREP_SECONDS,
     countdownSeconds: COUNTDOWN_SECONDS,
     breakSeconds: 7,

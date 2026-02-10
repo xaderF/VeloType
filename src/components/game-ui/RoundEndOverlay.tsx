@@ -139,6 +139,44 @@ export function RoundEndOverlay({
               winner={roundResult.winner}
             />
 
+            {drawAvailable && (
+              <motion.div
+                className="mt-4 w-full flex flex-col items-center gap-3 rounded-xl border border-primary/35 bg-primary/10 p-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="text-xs uppercase tracking-[0.16em] text-primary/90">Overtime Vote</div>
+                <div className="text-2xl font-semibold text-foreground">Draw Match?</div>
+                <div className="text-sm text-muted-foreground">Choose draw or continue.</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className={cn(
+                      'px-4 py-2 rounded-md border text-sm font-medium transition-colors',
+                      drawVoteSelection === 'draw'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'hover:bg-accent hover:text-accent-foreground',
+                    )}
+                    disabled={drawAccepted || drawVoteSelection !== null}
+                    onClick={onVoteDraw}
+                  >
+                    {drawVoteSelection === 'draw' ? 'Draw voted' : 'Draw'}
+                  </button>
+                  <button
+                    className={cn(
+                      'px-4 py-2 rounded-md border text-sm font-medium transition-colors',
+                      drawVoteSelection === 'continue'
+                        ? 'bg-secondary text-foreground border-border'
+                        : 'hover:bg-accent hover:text-accent-foreground',
+                    )}
+                    disabled={drawAccepted || drawVoteSelection !== null}
+                    onClick={onVoteContinue}
+                  >
+                    {drawVoteSelection === 'continue' ? 'Continue voted' : 'Continue'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* WPM Chart for this round */}
             {roundResult.playerStats.wpmHistory && roundResult.playerStats.wpmHistory.length > 1 && (
               <motion.div
@@ -158,57 +196,6 @@ export function RoundEndOverlay({
               transition={{ delay: 1 }}
             >
               <div>Break: next round auto-starts in {breakSeconds}s</div>
-
-              {drawAvailable && (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="text-sm text-muted-foreground">
-                    Overtime draw vote: choose draw or continue.
-                  </div>
-                  {(onVoteDraw || onVoteContinue) ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        className={cn(
-                          'px-4 py-2 rounded-md border text-sm font-medium transition-colors',
-                          drawVoteSelection === 'draw'
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'hover:bg-accent hover:text-accent-foreground',
-                        )}
-                        disabled={drawAccepted || drawVoteSelection !== null}
-                        onClick={onVoteDraw}
-                      >
-                        {drawVoteSelection === 'draw' ? 'Draw voted' : 'Draw'}
-                      </button>
-                      <button
-                        className={cn(
-                          'px-4 py-2 rounded-md border text-sm font-medium transition-colors',
-                          drawVoteSelection === 'continue'
-                            ? 'bg-secondary text-foreground border-border'
-                            : 'hover:bg-accent hover:text-accent-foreground',
-                        )}
-                        disabled={drawAccepted || drawVoteSelection !== null}
-                        onClick={onVoteContinue}
-                      >
-                        {drawVoteSelection === 'continue' ? 'Continue voted' : 'Continue'}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      className={cn(
-                        "px-4 py-2 rounded-md border text-sm font-medium transition-colors",
-                        drawAccepted
-                          ? "bg-secondary text-foreground"
-                          : drawOffered
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent hover:text-accent-foreground"
-                      )}
-                      disabled={drawAccepted}
-                      onClick={onOfferDraw}
-                    >
-                      {drawAccepted ? 'Draw confirmed' : drawOffered ? 'Waiting for opponent...' : 'Offer draw'}
-                    </button>
-                  )}
-                </div>
-              )}
             </motion.div>
           </motion.div>
         </motion.div>

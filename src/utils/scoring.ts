@@ -198,7 +198,8 @@ export const PARAGON_MIN_MMR = 2400;  // APEX_MIN_MMR + 300
  * Players above Velocity 3 (2100+) are capped at Velocity.
  */
 export function getRankFromRating(rating: number): RankInfo {
-  return RANKS.find(r => rating >= r.minRating && rating <= r.maxRating)
+  const safeRating = Math.max(0, rating);
+  return RANKS.find(r => safeRating >= r.minRating && safeRating <= r.maxRating)
     || RANKS[RANKS.length - 1]; // cap at Velocity for 1800+
 }
 

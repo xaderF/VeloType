@@ -141,14 +141,12 @@ const runtimeMatches = new Map<string, RuntimeMatchState>();
 const disconnectedPlayers = new Map<string, DisconnectedPlayer>(); // keyed by `${matchId}:${userId}`
 
 const RECONNECT_GRACE_MS = 30_000;
-const SUBMIT_GRACE_MS = 5_000;
-const DEFAULT_MAX_ROUNDS = 5;
+const SUBMIT_GRACE_MS = 30_000;
+const DEFAULT_MAX_ROUNDS = 6;
 const DEFAULT_BREAK_SECONDS = 7;
 const DEFAULT_COUNTDOWN_SECONDS = 3;
-const REGULATION_WIN_TARGET = 3;
-const WIN_BY_MARGIN = 2;
-const OVERTIME_TRIGGER_WINS = 2;
-const REGULATION_ROUNDS = 4;
+const OVERTIME_TRIGGER_WINS = 3;
+const REGULATION_ROUNDS = 6;
 const POINTS_PER_TIER = 100;
 const MAX_MMR_TIER_INDEX = 20; // Velocity 3
 const OVERPERFORM_GAMES_WINDOW = 10;
@@ -875,24 +873,33 @@ function applyRoundDamageAndWinner(
   const p1Wins = state.roundWins.get(p1) ?? 0;
   const p2Wins = state.roundWins.get(p2) ?? 0;
 
-  if (!state.overtimeActive && p1Wins >= OVERTIME_TRIGGER_WINS && p2Wins >= OVERTIME_TRIGGER_WINS) {
+  if (
+    !state.overtimeActive &&
+    ((p1Wins >= OVERTIME_TRIGGER_WINS && p2Wins >= OVERTIME_TRIGGER_WINS) || state.currentRound >= REGULATION_ROUNDS)
+  ) {
     state.overtimeActive = true;
   }
 
-  const hasWinnerByRounds =
-    (p1Wins >= REGULATION_WIN_TARGET || p2Wins >= REGULATION_WIN_TARGET) &&
-    Math.abs(p1Wins - p2Wins) >= WIN_BY_MARGIN;
-  const matchEnded = hasWinnerByRounds;
+  const p1KnockedOut = p1Hp <= 0;
+  const p2KnockedOut = p2Hp <= 0;
+  const matchEnded = p1KnockedOut || p2KnockedOut;
 
   if (matchEnded) {
-    state.winnerUserId = p1Wins > p2Wins ? p1 : p2;
+    if (p1KnockedOut && !p2KnockedOut) {
+      state.winnerUserId = p2;
+    } else if (p2KnockedOut && !p1KnockedOut) {
+      state.winnerUserId = p1;
+    } else if (roundWinner === p1 || roundWinner === p2) {
+      state.winnerUserId = roundWinner;
+    } else {
+      state.winnerUserId = null;
+    }
     state.drawWindowOpen = false;
     state.drawVotes.clear();
   } else {
     const roundsDone = state.currentRound;
     const drawWindowOpen =
       state.overtimeActive &&
-      p1Wins === p2Wins &&
       roundsDone > REGULATION_ROUNDS &&
       (roundsDone - REGULATION_ROUNDS) % 2 === 0;
     state.drawWindowOpen = drawWindowOpen;

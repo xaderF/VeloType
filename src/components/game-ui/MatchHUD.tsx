@@ -5,14 +5,21 @@ import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { HealthBar } from './HealthBar';
 import { RankBadge } from './RankBadge';
-import { Player } from '@/types/game';
 import { cn } from '@/lib/utils';
 
+interface HUDPlayer {
+  username: string;
+  rating: number | null;
+  hp: number;
+  maxHp: number;
+}
+
 interface MatchHUDProps {
-  player: Player;
-  opponent: Player;
+  player: HUDPlayer;
+  opponent: HUDPlayer;
   currentRound: number;
   maxRounds: number;
+  overtimeActive?: boolean;
   timeRemaining: number;
   playerDamage?: number;
   opponentDamage?: number;
@@ -24,6 +31,7 @@ export const MatchHUD = memo(function MatchHUD({
   opponent,
   currentRound,
   maxRounds,
+  overtimeActive = false,
   timeRemaining,
   playerDamage,
   opponentDamage,
@@ -39,7 +47,7 @@ export const MatchHUD = memo(function MatchHUD({
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1">
-            Round
+            {overtimeActive ? 'Overtime' : 'Round'}
           </div>
           <div className="text-3xl font-bold font-mono">
             {currentRound}/{maxRounds}

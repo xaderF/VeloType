@@ -19,6 +19,8 @@ interface TypingArenaProps {
   onCompleteRaw?: (typed: string, samples: number[], totalErrors: number, totalKeystrokes: number) => void;
   /** Called every ~500ms with the current typing state (for online progress reporting) */
   onProgressUpdate?: (typed: string, cursor: number, errors: number, startedAtMs: number | null) => void;
+  /** Called when user presses a character/backspace key (for typing-activity UX). */
+  onInputActivity?: () => void;
   /** Hide distracting UI for a clean, Monkeytype-style focus experience */
   focusMode?: boolean;
   /** Timer starts on first keystroke instead of immediately (used by free type) */
@@ -44,6 +46,7 @@ export function TypingArena({
   onComplete,
   onCompleteRaw,
   onProgressUpdate,
+  onInputActivity,
   focusMode = false,
   startOnFirstKeystroke: startOnFirstKeystrokeProp,
   infiniteText = false,
@@ -126,7 +129,12 @@ export function TypingArena({
         ref={inputRef}
         type="text"
         className="absolute opacity-0 pointer-events-none"
-        onKeyDown={handleKeyDown}
+        onKeyDown={(event) => {
+          if (event.key === 'Backspace' || event.key.length === 1) {
+            onInputActivity?.();
+          }
+          handleKeyDown(event);
+        }}
         autoFocus={isActive}
         disabled={!isActive}
       />

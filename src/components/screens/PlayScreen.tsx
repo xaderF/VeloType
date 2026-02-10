@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { MatchHUD } from '@/components/game-ui/MatchHUD';
 import { TypingArena } from '@/components/game-ui/TypingArena';
 import { TypingOptionsBar } from '@/components/game-ui/TypingOptionsBar';
@@ -27,6 +27,12 @@ interface PlayScreenProps {
   confirmForfeit?: boolean;
   /** Keep appending text as the cursor approaches the end. */
   infiniteText?: boolean;
+  /** Optional display override for player rank badge (e.g. null => UNRANKED badge). */
+  playerRatingDisplay?: number | null;
+  /** Show typing options bar above the arena. */
+  showTypingOptions?: boolean;
+  /** Optional authoritative overtime flag (online/server-driven). */
+  overtimeActiveOverride?: boolean;
 }
 
 export function PlayScreen({
@@ -43,8 +49,50 @@ export function PlayScreen({
   onForfeit,
   confirmForfeit = false,
   infiniteText = false,
+  playerRatingDisplay,
+  showTypingOptions = true,
+  overtimeActiveOverride,
 }: PlayScreenProps) {
   const [showForfeitDialog, setShowForfeitDialog] = useState(false);
+  const [isActivelyTyping, setIsActivelyTyping] = useState(false);
+  const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusModeActive = isTypingActive && isActivelyTyping;
+
+  const playerWins = match.roundResults.filter((r) => r.winner === 'player').length;
+  const opponentWins = match.roundResults.filter((r) => r.winner === 'opponent').length;
+  const inferredOvertime = match.currentRound > 6 || (match.winner === null && playerWins >= 3 && opponentWins >= 3);
+  const overtimeActive = Boolean(overtimeActiveOverride) || inferredOvertime;
+  const overtimeRoundIndex = Math.max(1, match.currentRound - 6);
+  const displayRound = overtimeActive ? ((overtimeRoundIndex - 1) % 2) + 1 : Math.min(match.currentRound, 6);
+  const displayMaxRounds = overtimeActive ? 2 : 6;
+
+  const markTypingActivity = useCallback(() => {
+    setIsActivelyTyping(true);
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+    }
+    typingIdleTimerRef.current = setTimeout(() => {
+      setIsActivelyTyping(false);
+      typingIdleTimerRef.current = null;
+    }, 220);
+  }, []);
+
+  useEffect(() => {
+    if (!isTypingActive) {
+      setIsActivelyTyping(false);
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+    }
+  }, [isTypingActive, currentText, match.currentRound]);
+
+  useEffect(() => () => {
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+      typingIdleTimerRef.current = null;
+    }
+  }, []);
 
   const handleForfeitClick = () => {
     if (confirmForfeit) {
@@ -60,7 +108,7 @@ export function PlayScreen({
       <div
         className={cn(
           'absolute inset-0 pointer-events-none transition-all duration-300',
-          isTypingActive
+          focusModeActive
             ? 'bg-lobby-bg/65 backdrop-blur-2xl'
             : 'bg-lobby-bg/45 backdrop-blur-[2px]',
         )}
@@ -90,43 +138,28 @@ export function PlayScreen({
       />
 
       <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
-        {/* HUD — hidden during active typing for focus */}
-        <AnimatePresence>
-          {!isTypingActive && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <MatchHUD
-                player={match.player}
-                opponent={match.opponent}
-                currentRound={match.currentRound}
-                maxRounds={match.maxRounds}
-                timeRemaining={timeRemaining}
-                playerDamage={playerDamage}
-                opponentDamage={opponentDamage}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Keep layout fixed; only fade UI in/out for focus mode. */}
+        <div className={cn("transition-opacity duration-100", focusModeActive && "opacity-0 pointer-events-none")}>
+          <MatchHUD
+            player={{ ...match.player, rating: playerRatingDisplay ?? match.player.rating }}
+            opponent={match.opponent}
+            currentRound={displayRound}
+            maxRounds={displayMaxRounds}
+            overtimeActive={overtimeActive}
+            timeRemaining={timeRemaining}
+            playerDamage={playerDamage}
+            opponentDamage={opponentDamage}
+          />
+        </div>
 
-        <AnimatePresence>
-          {!isTypingActive && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.15 }}
-            >
-              <TypingOptionsBar
-                punctuationEnabled={punctuationEnabled}
-                timeLimit={match.roundTimeSeconds}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {showTypingOptions && (
+          <div className={cn("transition-opacity duration-100", focusModeActive && "opacity-0 pointer-events-none")}>
+            <TypingOptionsBar
+              punctuationEnabled={punctuationEnabled}
+              timeLimit={match.roundTimeSeconds}
+            />
+          </div>
+        )}
 
         {/* Typing Arena */}
         <div className="flex-1 flex items-center">
@@ -137,26 +170,18 @@ export function PlayScreen({
             onComplete={onRoundComplete}
             onCompleteRaw={onRoundCompleteRaw}
             onProgressUpdate={onProgressUpdate}
-            focusMode={isTypingActive}
+            onInputActivity={markTypingActivity}
+            focusMode={focusModeActive}
             startOnFirstKeystroke={false}
             infiniteText={infiniteText}
           />
         </div>
 
-        {/* Round indicator — hidden during active typing */}
-        <AnimatePresence>
-          {!isTypingActive && (
-            <motion.div
-              className="text-center text-muted-foreground text-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              Round {match.currentRound} of {match.maxRounds} • Type fast, type accurate
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className={cn("text-center text-muted-foreground text-sm transition-opacity duration-100", focusModeActive && "opacity-0 pointer-events-none")}>
+          {overtimeActive
+            ? `Round ${displayRound}/${displayMaxRounds} • Overtime • Type fast, type accurate`
+            : `Round ${displayRound}/${displayMaxRounds} • Type fast, type accurate`}
+        </div>
       </div>
     </div>
   );

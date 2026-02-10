@@ -179,6 +179,8 @@ interface MatchResultsProps {
   eloChange: number;
   newRating: number;
   isWinner: boolean;
+  isUnranked?: boolean;
+  showRatingChange?: boolean;
   className?: string;
 }
 
@@ -190,6 +192,8 @@ export function MatchResults({
   eloChange,
   newRating,
   isWinner,
+  isUnranked = false,
+  showRatingChange = true,
   className,
 }: MatchResultsProps) {
   return (
@@ -312,31 +316,39 @@ export function MatchResults({
         </div>
       </motion.div>
 
-      {/* ELO change */}
-      <motion.div
-        className="text-center p-4 rounded-xl border border-border bg-card/50"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.65 }}
-      >
-        <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
-          Rating Change
-        </div>
-        <div className="flex items-center justify-center gap-4">
-          <span
-            className={cn(
-              "text-3xl font-bold font-mono",
-              eloChange >= 0 ? "text-hp-full" : "text-damage"
-            )}
-          >
-            {eloChange >= 0 ? '+' : ''}{eloChange}
-          </span>
-          <span className="text-muted-foreground">→</span>
-          <span className="text-3xl font-bold font-mono text-primary">
-            {newRating}
-          </span>
-        </div>
-      </motion.div>
+      {showRatingChange && (
+        <motion.div
+          className="text-center p-4 rounded-xl border border-border bg-card/50"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.65 }}
+        >
+          <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
+            {isUnranked ? 'Rank Status' : 'Rating Change'}
+          </div>
+          {isUnranked ? (
+            <div className="space-y-1">
+              <div className="text-2xl font-bold font-mono text-primary">UNRANKED</div>
+              <div className="text-xs text-muted-foreground">Gold 1 baseline matchmaking for bot rounds</div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-4">
+              <span
+                className={cn(
+                  "text-3xl font-bold font-mono",
+                  eloChange >= 0 ? "text-hp-full" : "text-damage"
+                )}
+              >
+                {eloChange >= 0 ? '+' : ''}{eloChange}
+              </span>
+              <span className="text-muted-foreground">→</span>
+              <span className="text-3xl font-bold font-mono text-primary">
+                {newRating}
+              </span>
+            </div>
+          )}
+        </motion.div>
+      )}
     </motion.div>
   );
 }

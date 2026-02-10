@@ -70,9 +70,6 @@ function applyLoadingCurve(progress: number): number {
   return 0.84 + tail * tail * 0.16; // 0.84 -> 1
 }
 
-const LOADING_VISIBLE_SECONDS = 5;
-const QUIET_PRE_COUNTDOWN_SECONDS = 3;
-
 function toRoundStats(player: {
   wpm: number;
   rawWpm: number;
@@ -115,6 +112,7 @@ export function useOnlineMatch(authToken: string | null) {
   const [match, setMatch] = useState<MatchState | null>(null);
   const [drawVoteWindowOpen, setDrawVoteWindowOpen] = useState(false);
   const [drawVoteSelection, setDrawVoteSelection] = useState<'draw' | 'continue' | null>(null);
+  const [overtimeActive, setOvertimeActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [latency, setLatency] = useState<LatencyStats | null>(null);
@@ -259,21 +257,12 @@ export function useOnlineMatch(authToken: string | null) {
       const remaining = Math.max(0, Math.ceil((targetStartAt - now) / 1000));
 
       if (remaining > countdownSecondsForRound) {
-        const secondsUntilCountdown = remaining - countdownSecondsForRound;
-        if (secondsUntilCountdown > QUIET_PRE_COUNTDOWN_SECONDS) {
-          const foundAt = matchFoundStartedAtRef.current ?? now;
-          const loadingEndAt = targetStartAt - (countdownSecondsForRound + QUIET_PRE_COUNTDOWN_SECONDS) * 1000;
-          const loadingStartAt = Math.max(
-            foundAt,
-            loadingEndAt - LOADING_VISIBLE_SECONDS * 1000,
-          );
-          const loadingDurationMs = Math.max(1, loadingEndAt - loadingStartAt);
-          const linearProgress = Math.max(0, Math.min(1, (now - loadingStartAt) / loadingDurationMs));
-          setMatchFoundProgress(applyLoadingCurve(linearProgress));
-        } else {
-          // Hold on a clean screen before the visible 3..2..1 countdown starts.
-          setMatchFoundProgress(null);
-        }
+        // Fill the loading bar across the full pre-countdown window.
+        const foundAt = matchFoundStartedAtRef.current ?? now;
+        const loadingEndAt = targetStartAt - countdownSecondsForRound * 1000;
+        const loadingDurationMs = Math.max(1, loadingEndAt - foundAt);
+        const linearProgress = Math.max(0, Math.min(1, (now - foundAt) / loadingDurationMs));
+        setMatchFoundProgress(applyLoadingCurve(linearProgress));
 
         setPhase('prepare');
         setPrepareSeconds(Math.max(0, remaining - countdownSecondsForRound));
@@ -429,6 +418,7 @@ export function useOnlineMatch(authToken: string | null) {
 
     setPhase('round_end');
     setDrawVoteWindowOpen(payload.drawWindowOpen);
+    setOvertimeActive(payload.overtimeActive);
     setDrawVoteSelection(null);
     setOpponentFinished(false);
     setOpponentProgress(null);
@@ -458,6 +448,7 @@ export function useOnlineMatch(authToken: string | null) {
     setOpponentFinished(false);
     setDrawVoteWindowOpen(false);
     setDrawVoteSelection(null);
+    setOvertimeActive(false);
     localRoundStatsRef.current.clear();
     matchFoundStartedAtRef.current = null;
 
@@ -528,7 +519,7 @@ export function useOnlineMatch(authToken: string | null) {
             maxHp: 100,
           },
           currentRound: 1,
-          maxRounds: data.config.maxRounds ?? 5,
+          maxRounds: data.config.maxRounds ?? 6,
           roundResults: [],
           roundTimeSeconds: data.config.limit,
           status: 'waiting',
@@ -555,6 +546,7 @@ export function useOnlineMatch(authToken: string | null) {
                 };
               });
               setDrawVoteWindowOpen(joinedCfg.drawWindowOpen ?? false);
+              setOvertimeActive(joinedCfg.overtimeActive ?? false);
               setDrawVoteSelection(null);
 
               if (joinedCfg.roundNumber && seedRef.current && matchConfigRef.current) {
@@ -592,7 +584,6 @@ export function useOnlineMatch(authToken: string | null) {
             stopProgressReporting();
             stopRoundClock();
             stopTransitionTimers();
-            const shouldAutoResetAfterForfeit = forfeitPendingRef.current;
             clearForfeitPending();
 
             const me = userIdRef.current;
@@ -607,13 +598,9 @@ export function useOnlineMatch(authToken: string | null) {
               });
             }
 
-            if (shouldAutoResetAfterForfeit) {
-              resetMatchRef.current();
-              return;
-            }
-
             setDrawVoteWindowOpen(false);
             setDrawVoteSelection(null);
+            setOvertimeActive(false);
             setPhase('complete');
             liveSocketRef.current?.close();
             liveSocketRef.current = null;
@@ -662,6 +649,7 @@ export function useOnlineMatch(authToken: string | null) {
               });
             }
             setDrawVoteWindowOpen(recovery.drawWindowOpen ?? false);
+            setOvertimeActive(recovery.overtimeActive ?? false);
             setDrawVoteSelection(null);
 
             if (phaseBeforeDisconnectRef.current === 'playing' && !progressIntervalRef.current) {
@@ -691,7 +679,7 @@ export function useOnlineMatch(authToken: string | null) {
             if (lower.includes('join required before match events')) return;
             if (
               (lower.includes('not in this match') || lower.includes('not in match')) &&
-              (forfeitPendingRef.current || phaseRef.current === 'idle' || phaseRef.current === 'complete')
+              (phaseRef.current === 'idle' || phaseRef.current === 'complete')
             ) {
               return;
             }
@@ -731,6 +719,7 @@ export function useOnlineMatch(authToken: string | null) {
     setPhase('idle');
     setQueueTime(0);
     setMatchFoundProgress(null);
+    setOvertimeActive(false);
     matchFoundStartedAtRef.current = null;
   }, []);
 
@@ -774,6 +763,7 @@ export function useOnlineMatch(authToken: string | null) {
     setMatch(null);
     setDrawVoteWindowOpen(false);
     setDrawVoteSelection(null);
+    setOvertimeActive(false);
     setError(null);
     setLatency(null);
     setReconnectAttempt(0);
@@ -804,16 +794,6 @@ export function useOnlineMatch(authToken: string | null) {
       resetMatch();
       return;
     }
-
-    forfeitPendingRef.current = true;
-    if (forfeitFallbackTimerRef.current) {
-      clearTimeout(forfeitFallbackTimerRef.current);
-    }
-    forfeitFallbackTimerRef.current = setTimeout(() => {
-      if (forfeitPendingRef.current) {
-        resetMatchRef.current();
-      }
-    }, 10_000);
 
     setPhase('waiting_opponent');
   }, [resetMatch, stopProgressReporting, stopRoundClock, stopTransitionTimers]);
@@ -849,6 +829,7 @@ export function useOnlineMatch(authToken: string | null) {
     match,
     drawVoteWindowOpen,
     drawVoteSelection,
+    overtimeActive,
     error,
     latency,
     reconnectAttempt,

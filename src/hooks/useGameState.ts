@@ -16,14 +16,14 @@ const OPPONENT_NAMES = [
   'BlitzTyper',
 ];
 
-const WIN_TARGET = 3;
-const WIN_BY_MARGIN = 2;
-const OVERTIME_TRIGGER_WINS = 2;
-const REGULATION_ROUNDS = 4;
+const OVERTIME_TRIGGER_WINS = 3;
+const REGULATION_ROUNDS = 6;
+const ROUND_BREAK_SECONDS = 7;
 
 interface UseGameStateProps {
   initialRating?: number;
   username?: string;
+  allowRatingProgress?: boolean;
 }
 
 export interface PracticeSettings {
@@ -34,10 +34,12 @@ export interface PracticeSettings {
 export function useGameState({
   initialRating = 1100,
   username = 'Player',
+  allowRatingProgress = true,
 }: UseGameStateProps = {}) {
   const [phase, setPhase] = useState<GamePhase>('home');
   const [queueTime, setQueueTime] = useState(0);
   const [countdown, setCountdown] = useState(3);
+  const [breakSeconds, setBreakSeconds] = useState(0);
   const [match, setMatch] = useState<MatchState | null>(null);
   const [roundStats, setRoundStats] = useState<RoundStats | null>(null);
   const [playerRating, setPlayerRating] = useState(initialRating);
@@ -57,6 +59,7 @@ export function useGameState({
   const drawConfirmTimerRef = useRef<NodeJS.Timeout | null>(null);
   const drawResolveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const breakCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const queueSessionRef = useRef(0);
 
   // Create player object (memoized to keep stable reference for hooks)
@@ -77,9 +80,11 @@ export function useGameState({
     if (queueTimerRef.current) clearInterval(queueTimerRef.current);
     if (queueMatchTimerRef.current) clearTimeout(queueMatchTimerRef.current);
     if (matchFoundTimerRef.current) clearTimeout(matchFoundTimerRef.current);
+    if (breakCountdownTimerRef.current) clearInterval(breakCountdownTimerRef.current);
 
     setPhase('queue');
     setQueueTime(0);
+    setBreakSeconds(0);
     
     queueTimerRef.current = setInterval(() => {
       setQueueTime((prev) => prev + 1);
@@ -95,7 +100,7 @@ export function useGameState({
       queueMatchTimerRef.current = null;
       
       // Generate opponent
-      const opponentRating = playerRating + Math.floor((Math.random() - 0.5) * 200);
+      const opponentRating = Math.max(0, playerRating + Math.floor((Math.random() - 0.5) * 200));
       const opponent: Player = {
         id: '2',
         username: OPPONENT_NAMES[Math.floor(Math.random() * OPPONENT_NAMES.length)],
@@ -112,7 +117,7 @@ export function useGameState({
         player: { ...player, hp: 100, maxHp: 100 },
         opponent,
         currentRound: 1,
-        maxRounds: 5,
+        maxRounds: 6,
         roundResults: [],
         roundTimeSeconds: practiceSettings.timeLimitSeconds,
         status: 'waiting',
@@ -145,11 +150,14 @@ export function useGameState({
     if (queueTimerRef.current) clearInterval(queueTimerRef.current);
     if (queueMatchTimerRef.current) clearTimeout(queueMatchTimerRef.current);
     if (matchFoundTimerRef.current) clearTimeout(matchFoundTimerRef.current);
+    if (breakCountdownTimerRef.current) clearInterval(breakCountdownTimerRef.current);
     queueTimerRef.current = null;
     queueMatchTimerRef.current = null;
     matchFoundTimerRef.current = null;
+    breakCountdownTimerRef.current = null;
     setPhase('home');
     setQueueTime(0);
+    setBreakSeconds(0);
     setDrawOffered(false);
     setDrawAccepted(false);
     setDrawWindowOpen(false);
@@ -158,6 +166,7 @@ export function useGameState({
   // Handle countdown
   useEffect(() => {
     if (phase !== 'countdown') return;
+    setBreakSeconds(0);
 
     if (countdown > 0) {
       countdownTimerRef.current = setTimeout(() => {
@@ -214,16 +223,20 @@ export function useGameState({
     
     // Determine winner and damage
     let winner: 'player' | 'opponent' | 'draw' = 'draw';
-    let damageDealt = 0;
-    let damageTaken = 0;
+    let rawDamageDealt = 0;
+    let rawDamageTaken = 0;
     
     if (playerScore > opponentScore) {
       winner = 'player';
-      damageDealt = damageFromScores(playerScore, opponentScore);
+      rawDamageDealt = damageFromScores(playerScore, opponentScore);
     } else if (opponentScore > playerScore) {
       winner = 'opponent';
-      damageTaken = damageFromScores(opponentScore, playerScore);
+      rawDamageTaken = damageFromScores(opponentScore, playerScore);
     }
+
+    // Effective damage cannot exceed remaining HP.
+    const damageDealt = Math.min(match.opponent.hp, rawDamageDealt);
+    const damageTaken = Math.min(match.player.hp, rawDamageTaken);
 
     const roundResult: RoundResult = {
       roundNumber: match.currentRound,
@@ -240,25 +253,32 @@ export function useGameState({
     const newPlayerHp = Math.max(0, match.player.hp - damageTaken);
     const newOpponentHp = Math.max(0, match.opponent.hp - damageDealt);
     
-    // Check for match end (first to 3, win by 2)
+    // Match end is HP-based only. Round wins are used for overtime/draw flow.
     const roundResults = [...match.roundResults, roundResult];
     const playerWins = roundResults.filter((r) => r.winner === 'player').length;
     const opponentWins = roundResults.filter((r) => r.winner === 'opponent').length;
-    const winDiff = Math.abs(playerWins - opponentWins);
 
-    const matchEnded =
-      (playerWins >= WIN_TARGET || opponentWins >= WIN_TARGET) &&
-      winDiff >= WIN_BY_MARGIN;
+    const playerKnockedOut = newPlayerHp <= 0;
+    const opponentKnockedOut = newOpponentHp <= 0;
+    const matchEnded = playerKnockedOut || opponentKnockedOut;
 
-    const matchWinner: 'player' | 'opponent' | 'draw' | null = matchEnded
-      ? (playerWins > opponentWins ? 'player' : 'opponent')
-      : null;
+    let matchWinner: 'player' | 'opponent' | 'draw' | null = null;
+    if (matchEnded) {
+      if (playerKnockedOut && !opponentKnockedOut) {
+        matchWinner = 'opponent';
+      } else if (opponentKnockedOut && !playerKnockedOut) {
+        matchWinner = 'player';
+      } else {
+        matchWinner = winner;
+      }
+    }
 
-    const overtimeActive = playerWins >= OVERTIME_TRIGGER_WINS && opponentWins >= OVERTIME_TRIGGER_WINS;
+    const overtimeActive =
+      (playerWins >= OVERTIME_TRIGGER_WINS && opponentWins >= OVERTIME_TRIGGER_WINS) ||
+      roundResults.length >= REGULATION_ROUNDS;
     const nextDrawWindowOpen =
       !matchEnded &&
       overtimeActive &&
-      playerWins === opponentWins &&
       roundResults.length > REGULATION_ROUNDS &&
       (roundResults.length - REGULATION_ROUNDS) % 2 === 0;
 
@@ -275,7 +295,7 @@ export function useGameState({
         player: { ...prev.player, hp: newPlayerHp },
         opponent: { ...prev.opponent, hp: newOpponentHp },
         currentRound: matchEnded ? prev.currentRound : prev.currentRound + 1,
-        maxRounds: Math.max(5, matchEnded ? prev.currentRound : prev.currentRound + 1),
+        maxRounds: Math.max(6, matchEnded ? prev.currentRound : prev.currentRound + 1),
         roundResults,
         status: matchEnded ? 'match_end' : 'round_end',
         winner: matchWinner,
@@ -285,11 +305,14 @@ export function useGameState({
     setPhase('round_end');
     if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
     if (roundAdvanceTimerRef.current) clearTimeout(roundAdvanceTimerRef.current);
+    if (breakCountdownTimerRef.current) clearInterval(breakCountdownTimerRef.current);
+    breakCountdownTimerRef.current = null;
 
     // If match ended, calculate ELO and go to results
     if (matchEnded) {
+      setBreakSeconds(0);
       resultsTimerRef.current = setTimeout(() => {
-        if (matchWinner !== null) {
+        if (matchWinner !== null && allowRatingProgress) {
           const result: 'win' | 'loss' | 'draw' = matchWinner === 'draw' ? 'draw' : matchWinner === 'player' ? 'win' : 'loss';
           const eloChange = calculateEloChange(
             playerRating,
@@ -303,14 +326,29 @@ export function useGameState({
       }, 3000);
     } else {
       // 7s break between rounds, then normal countdown
-      const breakMs = 7000;
+      const breakMs = ROUND_BREAK_SECONDS * 1000;
+      const breakEndsAt = Date.now() + breakMs;
+      setBreakSeconds(ROUND_BREAK_SECONDS);
+      breakCountdownTimerRef.current = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((breakEndsAt - Date.now()) / 1000));
+        setBreakSeconds(remaining);
+        if (remaining <= 0 && breakCountdownTimerRef.current) {
+          clearInterval(breakCountdownTimerRef.current);
+          breakCountdownTimerRef.current = null;
+        }
+      }, 150);
       roundAdvanceTimerRef.current = setTimeout(() => {
+        if (breakCountdownTimerRef.current) {
+          clearInterval(breakCountdownTimerRef.current);
+          breakCountdownTimerRef.current = null;
+        }
+        setBreakSeconds(0);
         setPhase('countdown');
         setCountdown(3);
         roundAdvanceTimerRef.current = null;
       }, breakMs);
     }
-  }, [match, playerRating, simulateOpponentStats]);
+  }, [allowRatingProgress, match, playerRating, simulateOpponentStats]);
 
   // Overtime draw vote — available every 2 tied overtime rounds.
   const offerDraw = useCallback(() => {
@@ -336,6 +374,11 @@ export function useGameState({
         clearTimeout(roundAdvanceTimerRef.current);
         roundAdvanceTimerRef.current = null;
       }
+      if (breakCountdownTimerRef.current) {
+        clearInterval(breakCountdownTimerRef.current);
+        breakCountdownTimerRef.current = null;
+      }
+      setBreakSeconds(0);
 
       setMatch((prev) => {
         if (!prev) return null;
@@ -347,14 +390,16 @@ export function useGameState({
       });
 
       drawResolveTimerRef.current = setTimeout(() => {
-        const eloChange = calculateEloChange(playerRating, match.opponent.rating, 'draw');
-        setPlayerRating((prev) => prev + eloChange);
+        if (allowRatingProgress) {
+          const eloChange = calculateEloChange(playerRating, match.opponent.rating, 'draw');
+          setPlayerRating((prev) => prev + eloChange);
+        }
         setPhase('results');
         drawResolveTimerRef.current = null;
       }, 1200);
       drawConfirmTimerRef.current = null;
     }, 800);
-  }, [drawWindowOpen, match, playerRating]);
+  }, [allowRatingProgress, drawWindowOpen, match, playerRating]);
 
   const continueAfterDrawPrompt = useCallback(() => {
     if (!drawWindowOpen) return;
@@ -396,6 +441,7 @@ export function useGameState({
     if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
     if (drawConfirmTimerRef.current) clearTimeout(drawConfirmTimerRef.current);
     if (drawResolveTimerRef.current) clearTimeout(drawResolveTimerRef.current);
+    if (breakCountdownTimerRef.current) clearInterval(breakCountdownTimerRef.current);
     queueTimerRef.current = null;
     queueMatchTimerRef.current = null;
     matchFoundTimerRef.current = null;
@@ -404,12 +450,14 @@ export function useGameState({
     resultsTimerRef.current = null;
     drawConfirmTimerRef.current = null;
     drawResolveTimerRef.current = null;
+    breakCountdownTimerRef.current = null;
 
     setMatch(null);
     setRoundStats(null);
     setPhase('home');
     setQueueTime(0);
     setCountdown(3);
+    setBreakSeconds(0);
     setDrawOffered(false);
     setDrawAccepted(false);
     setDrawWindowOpen(false);
@@ -426,20 +474,23 @@ export function useGameState({
       if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
       if (drawConfirmTimerRef.current) clearTimeout(drawConfirmTimerRef.current);
       if (drawResolveTimerRef.current) clearTimeout(drawResolveTimerRef.current);
+      if (breakCountdownTimerRef.current) clearInterval(breakCountdownTimerRef.current);
     };
   }, []);
 
   // Calculate ELO change for display
   const getEloChange = useCallback(() => {
+    if (!allowRatingProgress) return 0;
     if (!match || !match.winner) return 0;
     const result: 'win' | 'loss' | 'draw' = match.winner === 'draw' ? 'draw' : match.winner === 'player' ? 'win' : 'loss';
     return calculateEloChange(playerRating, match.opponent.rating, result);
-  }, [match, playerRating]);
+  }, [allowRatingProgress, match, playerRating]);
 
   return {
     phase,
     queueTime,
     countdown,
+    breakSeconds,
     match,
     player,
     playerRating,

@@ -11,6 +11,8 @@ interface ResultsScreenProps {
   opponentStats: RoundStats;
   eloChange: number;
   newRating: number;
+  isUnranked?: boolean;
+  showRatingChange?: boolean;
   onBackToMenu: () => void;
 }
 
@@ -20,13 +22,16 @@ export function ResultsScreen({
   opponentStats,
   eloChange,
   newRating,
+  isUnranked = false,
+  showRatingChange = true,
   onBackToMenu,
 }: ResultsScreenProps) {
   const isWinner = match.winner === 'player';
   const oldRating = newRating - eloChange;
   const oldRank = getRankFromRating(oldRating);
   const newRank = getRankFromRating(newRating);
-  const rankUp = newRank.rank !== oldRank.rank && newRating > oldRating;
+  const rankUp = showRatingChange && !isUnranked && newRank.rank !== oldRank.rank && newRating > oldRating;
+  const shouldScrollRoundBreakdown = match.roundResults.length > 4;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-grid-pattern relative overflow-hidden">
@@ -52,6 +57,8 @@ export function ResultsScreen({
           eloChange={eloChange}
           newRating={newRating}
           isWinner={isWinner}
+          isUnranked={isUnranked}
+          showRatingChange={showRatingChange}
         />
 
         {/* Rank up celebration */}
@@ -89,7 +96,12 @@ export function ResultsScreen({
           <h3 className="text-sm font-medium text-muted-foreground mb-3">
             Round Breakdown
           </h3>
-          <div className="space-y-2">
+          <div
+            className={cn(
+              "space-y-2",
+              shouldScrollRoundBreakdown && "max-h-[13.5rem] overflow-y-auto pr-1"
+            )}
+          >
             {match.roundResults.map((result, index) => (
               <div
                 key={index}

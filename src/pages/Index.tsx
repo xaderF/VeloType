@@ -25,7 +25,91 @@ import { TypingArena } from '@/components/game-ui/TypingArena';
 import { WpmChart } from '@/components/game-ui/WpmChart';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { makeRng } from '@/game/engine';
 import { getSeededText, generateMatchSeed } from '@/utils/textSeed';
+
+type PracticeTextSettings = {
+  words: boolean;
+  punctuation: boolean;
+  numbers: boolean;
+};
+
+const PUNCTUATION_TOKENS = ['.', '!', '?', ',', ';', ':', '"'] as const;
+const UNRANKED_GOLD1_BASELINE_RATING = 900;
+
+function normalizePracticeTextSettings(settings: PracticeTextSettings): PracticeTextSettings {
+  if (settings.words || settings.punctuation || settings.numbers) {
+    return settings;
+  }
+  return { ...settings, words: true };
+}
+
+function buildNumberToken(rng: () => number): string {
+  const length = 3 + Math.floor(rng() * 5); // 3-7 digits
+  let out = '';
+  for (let i = 0; i < length; i += 1) {
+    out += String(Math.floor(rng() * 10));
+  }
+  return out;
+}
+
+function buildPunctuationToken(rng: () => number): string {
+  return PUNCTUATION_TOKENS[Math.floor(rng() * PUNCTUATION_TOKENS.length)] ?? '.';
+}
+
+function buildTokenOnlyText(length: number, rng: () => number, settings: PracticeTextSettings): string {
+  const tokens: string[] = [];
+  let chars = 0;
+
+  while (chars < length) {
+    let token = '.';
+    if (settings.numbers && settings.punctuation) {
+      token = rng() < 0.65 ? buildNumberToken(rng) : buildPunctuationToken(rng);
+    } else if (settings.numbers) {
+      token = buildNumberToken(rng);
+    } else {
+      token = buildPunctuationToken(rng);
+    }
+    tokens.push(token);
+    chars += token.length + 1;
+  }
+
+  return tokens.join(' ').slice(0, length).trim();
+}
+
+function injectNumbersIntoWordText(base: string, length: number, rng: () => number): string {
+  const sourceWords = base.split(/\s+/).filter(Boolean);
+  if (sourceWords.length === 0) return '';
+
+  const pickWord = () => sourceWords[Math.floor(rng() * sourceWords.length)] ?? sourceWords[0];
+  const tokens: string[] = [];
+  let chars = 0;
+
+  while (chars < length) {
+    const token = rng() < 0.18 ? buildNumberToken(rng) : pickWord();
+    tokens.push(token);
+    chars += token.length + 1;
+  }
+
+  return tokens.join(' ').slice(0, length).trim();
+}
+
+function buildPracticeChunk(seed: string | number, length: number, settings: PracticeTextSettings): string {
+  const normalized = normalizePracticeTextSettings(settings);
+  const rng = makeRng(seed);
+
+  if (!normalized.words) {
+    return buildTokenOnlyText(length, rng, normalized);
+  }
+
+  const base = getSeededText(seed, {
+    length,
+    includePunctuation: normalized.punctuation,
+  });
+
+  if (!normalized.numbers) return base;
+  return injectNumbersIntoWordText(base, length, rng);
+}
 
 // ---------------------------------------------------------------------------
 // Auth panel (inline login / register)
@@ -239,6 +323,9 @@ function OnlinePlayScreen({
 }) {
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
   const [showForfeitDialog, setShowForfeitDialog] = useState(false);
+  const [isActivelyTyping, setIsActivelyTyping] = useState(false);
+  const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusModeActive = isTypingActive && isActivelyTyping;
 
   useEffect(() => {
     setTimeRemaining(timeLimit);
@@ -248,13 +335,41 @@ function OnlinePlayScreen({
     return () => clearInterval(interval);
   }, [timeLimit]);
 
+  useEffect(() => {
+    if (!isTypingActive) {
+      setIsActivelyTyping(false);
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+    }
+  }, [isTypingActive, targetText]);
+
+  useEffect(() => () => {
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+      typingIdleTimerRef.current = null;
+    }
+  }, []);
+
+  const markTypingActivity = useCallback(() => {
+    setIsActivelyTyping(true);
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+    }
+    typingIdleTimerRef.current = setTimeout(() => {
+      setIsActivelyTyping(false);
+      typingIdleTimerRef.current = null;
+    }, 1000);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-lobby-bg relative overflow-hidden">
       <LetterParticles />
       <div
         className={cn(
           'absolute inset-0 pointer-events-none transition-all duration-300',
-          isTypingActive
+          focusModeActive
             ? 'bg-lobby-bg/65 backdrop-blur-xl'
             : 'bg-lobby-bg/45 backdrop-blur-[2px]',
         )}
@@ -284,28 +399,48 @@ function OnlinePlayScreen({
       />
 
       <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
-        {/* Minimal HUD */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card/50">
-          <div className="text-sm text-muted-foreground">
-            vs <span className="font-semibold text-foreground">{opponent?.username ?? 'Opponent'}</span>
-            {opponent && (
-              <span className="ml-2 text-xs">
-                ({opponent.rating == null ? 'UNRANKED' : `${opponent.rating} ELO`})
-              </span>
-            )}
-          </div>
-          <div className="text-2xl font-bold font-mono text-primary">{timeRemaining}s</div>
-          {opponentProgress && (
-            <div className="text-sm text-muted-foreground">
-              Opponent: {opponentProgress.typedLength} chars
-            </div>
+        <AnimatePresence>
+          {!focusModeActive && (
+            <motion.div
+              className="flex items-center justify-between p-4 rounded-xl border border-border bg-card/50"
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.15 }}
+            >
+              <div className="text-sm text-muted-foreground">
+                vs <span className="font-semibold text-foreground">{opponent?.username ?? 'Opponent'}</span>
+                {opponent && (
+                  <span className="ml-2 text-xs">
+                    ({opponent.rating == null ? 'UNRANKED' : `${opponent.rating} ELO`})
+                  </span>
+                )}
+              </div>
+              <div className="text-2xl font-bold font-mono text-primary">{timeRemaining}s</div>
+              {opponentProgress && (
+                <div className="text-sm text-muted-foreground">
+                  Opponent: {opponentProgress.typedLength} chars
+                </div>
+              )}
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
 
-        <TypingOptionsBar
-          punctuationEnabled={punctuationEnabled}
-          timeLimit={timeLimit}
-        />
+        <AnimatePresence>
+          {!focusModeActive && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <TypingOptionsBar
+                punctuationEnabled={punctuationEnabled}
+                timeLimit={timeLimit}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Typing Arena */}
         <div className="flex-1 flex items-center">
@@ -316,7 +451,8 @@ function OnlinePlayScreen({
             onComplete={onComplete}
             onCompleteRaw={onCompleteRaw}
             onProgressUpdate={onProgressUpdate}
-            focusMode={isTypingActive}
+            onInputActivity={markTypingActivity}
+            focusMode={focusModeActive}
             startOnFirstKeystroke={false}
           />
         </div>
@@ -346,6 +482,11 @@ function OnlineResultsScreen({
   const isDraw = my.result === 'draw';
   const roundResults = match?.roundResults ?? [];
   const scoreline = `${roundResults.filter((r) => r.winner === 'player').length}-${roundResults.filter((r) => r.winner === 'opponent').length}`;
+  const roundRecapRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollRoundRecap = (direction: -1 | 1) => {
+    roundRecapRef.current?.scrollBy({ left: 320 * direction, behavior: 'smooth' });
+  };
 
   const comparisonRows = [
     { label: 'WPM', my: Math.round(my.wpm), opp: Math.round(opp.wpm), suffix: '' },
@@ -450,14 +591,40 @@ function OnlineResultsScreen({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
           >
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-              Round Recap
-            </h3>
-            <div className="round-recap-scrollbar flex gap-3 overflow-x-scroll pb-2 snap-x snap-mandatory">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Round Recap
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => scrollRoundRecap(-1)}
+                  className="h-8 w-8 rounded-md border border-border bg-background/60 text-sm text-foreground hover:bg-accent"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollRoundRecap(1)}
+                  className="h-8 w-8 rounded-md border border-border bg-background/60 text-sm text-foreground hover:bg-accent"
+                >
+                  →
+                </button>
+              </div>
+            </div>
+            <div
+              ref={roundRecapRef}
+              className="round-recap-scrollbar flex flex-nowrap gap-3 overflow-x-auto overflow-y-hidden pb-2 pr-2 snap-x snap-mandatory touch-pan-x select-none"
+              onWheel={(event) => {
+                if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+                  event.currentTarget.scrollLeft += event.deltaY;
+                }
+              }}
+            >
               {roundResults.map((round) => (
                 <div
                   key={round.roundNumber}
-                  className="min-w-[220px] snap-start rounded-lg border border-border/80 bg-background/40 p-3 space-y-2"
+                  className="w-[260px] shrink-0 snap-start rounded-lg border border-border/80 bg-background/40 p-3 space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground uppercase tracking-wide">Round {round.roundNumber}</span>
@@ -523,6 +690,7 @@ const Index = () => {
   const [showModeSelect, setShowModeSelect] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOnlineRoundEndForfeitDialog, setShowOnlineRoundEndForfeitDialog] = useState(false);
+  const [showOfflineRoundEndForfeitDialog, setShowOfflineRoundEndForfeitDialog] = useState(false);
   const [showFps, setShowFps] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('veloxtype:show-fps') === '1';
@@ -543,15 +711,21 @@ const Index = () => {
   const [practiceText, setPracticeText] = useState('');
   const [practiceResults, setPracticeResults] = useState<RoundStats | null>(null);
   const [practiceTimeLimit, setPracticeTimeLimit] = useState<0 | 15 | 30 | 60 | 120>(30);
-  const [practicePunctuation, setPracticePunctuation] = useState(false);
+  const [practiceContent, setPracticeContent] = useState<PracticeTextSettings>({
+    words: true,
+    punctuation: false,
+    numbers: false,
+  });
   const [practiceKey, setPracticeKey] = useState(0); // forces TypingArena remount
   const [practiceStarted, setPracticeStarted] = useState(false); // true once first key pressed
   const [practiceStopSignal, setPracticeStopSignal] = useState(0);
+  const isUnrankedOfflineProfile = !auth.isAuthenticated || auth.user?.rating == null;
 
   // Offline (simulated) game state
   const offline = useGameState({
-    initialRating: auth.user?.rating ?? 0,
-    username: auth.user?.username ?? 'Player',
+    initialRating: auth.user?.rating ?? UNRANKED_GOLD1_BASELINE_RATING,
+    username: auth.user?.username ?? 'Guest',
+    allowRatingProgress: false,
   });
 
   // Online game state
@@ -608,22 +782,43 @@ const Index = () => {
   }, [offline]);
 
   const buildPracticeText = useCallback(
-    (includePunctuation: boolean, limit: 0 | 15 | 30 | 60 | 120) => {
+    (settings: PracticeTextSettings, limit: 0 | 15 | 30 | 60 | 120) => {
       const seed = generateMatchSeed();
       const targetLength = limit === 0
         ? 30_000
         : Math.max(1200, Math.min(9000, limit * 40));
-      return getSeededText(seed, {
-        length: targetLength,
-        includePunctuation,
-      });
+      return buildPracticeChunk(seed, targetLength, settings);
     },
     [],
   );
 
+  const updatePracticeConfig = useCallback((
+    nextSettings: PracticeTextSettings,
+    nextLimit: 0 | 15 | 30 | 60 | 120,
+  ) => {
+    const normalized = normalizePracticeTextSettings(nextSettings);
+    setPracticeContent(normalized);
+    setPracticeTimeLimit(nextLimit);
+    const text = buildPracticeText(normalized, nextLimit);
+    setPracticeText(text);
+    setPracticeKey((k) => k + 1);
+  }, [buildPracticeText]);
+
+  const practiceInfiniteChunkGenerator = useCallback(({ chunkIndex, currentTarget }: {
+    chunkIndex: number;
+    currentTarget: string;
+    currentCursor: number;
+  }) => {
+    return buildPracticeChunk(
+      `practice-stream-${chunkIndex}-${currentTarget.length}`,
+      520,
+      practiceContent,
+    );
+  }, [practiceContent]);
+
   // Start solo practice (MonkeyType-style)
   const startPractice = useCallback(() => {
-    const text = buildPracticeText(practicePunctuation, practiceTimeLimit);
+    const text = buildPracticeText(practiceContent, practiceTimeLimit);
     setPracticeText(text);
     setPracticeResults(null);
     setPracticePhase('typing');
@@ -632,7 +827,7 @@ const Index = () => {
     setPracticeKey((k) => k + 1);
     setShowModeSelect(false);
     setPlayMode('practice');
-  }, [buildPracticeText, practicePunctuation, practiceTimeLimit]);
+  }, [buildPracticeText, practiceContent, practiceTimeLimit]);
 
   // Open the mode-select sub-screen
   const openModeSelect = useCallback(() => {
@@ -652,14 +847,14 @@ const Index = () => {
 
   // Restart practice with new text
   const restartPractice = useCallback(() => {
-    const text = buildPracticeText(practicePunctuation, practiceTimeLimit);
+    const text = buildPracticeText(practiceContent, practiceTimeLimit);
     setPracticeText(text);
     setPracticeResults(null);
     setPracticePhase('typing');
     setPracticeStarted(false);
     setPracticeStopSignal(0);
     setPracticeKey((k) => k + 1);
-  }, [buildPracticeText, practicePunctuation, practiceTimeLimit]);
+  }, [buildPracticeText, practiceContent, practiceTimeLimit]);
 
   // Handle practice completion
   const handlePracticeComplete = useCallback((stats: RoundStats) => {
@@ -686,6 +881,12 @@ const Index = () => {
       setShowAuth(false);
     }
   }, [auth.isAuthenticated, showAuth]);
+
+  useEffect(() => {
+    if (offline.phase !== 'round_end' && showOfflineRoundEndForfeitDialog) {
+      setShowOfflineRoundEndForfeitDialog(false);
+    }
+  }, [offline.phase, showOfflineRoundEndForfeitDialog]);
 
   // Keep the mode-select screen stable while queueing to avoid mount/unmount flicker.
   // Move to online flow only when an actual match lifecycle starts.
@@ -746,9 +947,15 @@ const Index = () => {
     setShowModeSelect(true);
   }, [offline]);
 
-  // Forfeit handler for online (competitive) — leave match and reopen play mode selector
+  // In-match forfeit (competitive): concede and still show end-of-match summary.
   const handleOnlineForfeit = useCallback(() => {
     online.forfeitMatch();
+  }, [online]);
+
+  // Exit/quit flow (competitive): immediately leave to mode select.
+  const handleOnlineQuit = useCallback(() => {
+    online.resetMatch();
+    setPlayMode('offline');
     setShowModeSelect(true);
   }, [online]);
 
@@ -907,6 +1114,8 @@ const Index = () => {
               onForfeit={handleOnlineForfeit}
               confirmForfeit
               infiniteText={false}
+              showTypingOptions={false}
+              overtimeActiveOverride={online.overtimeActive}
             />
 
             <CountdownOverlay
@@ -936,14 +1145,14 @@ const Index = () => {
                   onClick={() => setShowOnlineRoundEndForfeitDialog(true)}
                   className="fixed top-4 left-4 z-[70] px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
                 >
-                  ✕ Forfeit
+                  ✕ Exit Match
                 </button>
                 <ForfeitConfirmDialog
                   isOpen={showOnlineRoundEndForfeitDialog}
                   onCancel={() => setShowOnlineRoundEndForfeitDialog(false)}
                   onConfirm={() => {
                     setShowOnlineRoundEndForfeitDialog(false);
-                    handleOnlineForfeit();
+                    handleOnlineQuit();
                   }}
                 />
               </>
@@ -1138,21 +1347,41 @@ const Index = () => {
                   transition={{ duration: 0.15 }}
                 >
                   <TypingOptionsBar
-                    punctuationEnabled={practicePunctuation}
+                    wordsEnabled={practiceContent.words}
+                    punctuationEnabled={practiceContent.punctuation}
+                    numbersEnabled={practiceContent.numbers}
                     timeLimit={practiceTimeLimit}
                     allowEndless
+                    onToggleWords={() => {
+                      updatePracticeConfig(
+                        {
+                          ...practiceContent,
+                          words: !practiceContent.words,
+                        },
+                        practiceTimeLimit,
+                      );
+                    }}
                     onTogglePunctuation={() => {
-                      setPracticePunctuation((p) => !p);
-                      const text = buildPracticeText(!practicePunctuation, practiceTimeLimit);
-                      setPracticeText(text);
-                      setPracticeKey((k) => k + 1);
+                      updatePracticeConfig(
+                        {
+                          ...practiceContent,
+                          punctuation: !practiceContent.punctuation,
+                        },
+                        practiceTimeLimit,
+                      );
+                    }}
+                    onToggleNumbers={() => {
+                      updatePracticeConfig(
+                        {
+                          ...practiceContent,
+                          numbers: !practiceContent.numbers,
+                        },
+                        practiceTimeLimit,
+                      );
                     }}
                     onTimeLimitChange={(seconds) => {
                       const next = ([0, 15, 30, 60, 120].includes(seconds) ? seconds : 30) as 0 | 15 | 30 | 60 | 120;
-                      setPracticeTimeLimit(next);
-                      const text = buildPracticeText(practicePunctuation, next);
-                      setPracticeText(text);
-                      setPracticeKey((k) => k + 1);
+                      updatePracticeConfig(practiceContent, next);
                     }}
                   />
                 </motion.div>
@@ -1181,6 +1410,7 @@ const Index = () => {
                     onComplete={handlePracticeComplete}
                     focusMode
                     infiniteText
+                    infiniteChunkGenerator={practiceInfiniteChunkGenerator}
                     forceFinishSignal={practiceStopSignal}
                   />
                 </motion.div>
@@ -1369,6 +1599,7 @@ const Index = () => {
           onForfeit={handleOfflineForfeit}
           confirmForfeit
           infiniteText
+          playerRatingDisplay={isUnrankedOfflineProfile ? null : offline.match.player.rating}
         />
       )}
 
@@ -1377,8 +1608,10 @@ const Index = () => {
           match={offline.match}
           playerStats={getAggregateStats()}
           opponentStats={getOpponentAggregateStats()}
-          eloChange={offline.getEloChange()}
+          eloChange={0}
           newRating={offline.playerRating}
+          isUnranked={isUnrankedOfflineProfile}
+          showRatingChange={false}
           onBackToMenu={offline.playAgain}
         />
       )}
@@ -1391,7 +1624,14 @@ const Index = () => {
       />
 
       {offline.match && (
-        <MatchFoundOverlay isVisible={offline.phase === 'match_found'} player={offline.player} opponent={offline.match.opponent} />
+        <MatchFoundOverlay
+          isVisible={offline.phase === 'match_found'}
+          player={{
+            username: offline.player.username,
+            rating: isUnrankedOfflineProfile ? null : offline.player.rating,
+          }}
+          opponent={offline.match.opponent}
+        />
       )}
 
       <CountdownOverlay count={offline.countdown > 0 ? offline.countdown : 'GO!'} isVisible={offline.phase === 'countdown'} />
@@ -1404,13 +1644,33 @@ const Index = () => {
         drawAccepted={offline.drawAccepted}
         onVoteDraw={offline.offerDraw}
         onVoteContinue={offline.continueAfterDrawPrompt}
-        breakSeconds={7}
+        breakSeconds={Math.max(0, offline.breakSeconds)}
         playerName={offline.match?.player.username}
         opponentName={offline.match?.opponent.username}
         playerHp={offline.match?.player.hp}
         opponentHp={offline.match?.opponent.hp}
         maxHp={offline.match?.player.maxHp}
       />
+
+      {/* Keep exit available even while round-end overlay is shown (same behavior as competitive) */}
+      {offline.phase === 'round_end' && (
+        <>
+          <button
+            onClick={() => setShowOfflineRoundEndForfeitDialog(true)}
+            className="fixed top-4 left-4 z-[70] px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
+          >
+            ✕ Exit Match
+          </button>
+          <ForfeitConfirmDialog
+            isOpen={showOfflineRoundEndForfeitDialog}
+            onCancel={() => setShowOfflineRoundEndForfeitDialog(false)}
+            onConfirm={() => {
+              setShowOfflineRoundEndForfeitDialog(false);
+              handleOfflineForfeit();
+            }}
+          />
+        </>
+      )}
 
       <PlayModeSelect
         isVisible={showModeSelect}

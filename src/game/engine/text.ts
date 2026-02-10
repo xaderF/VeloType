@@ -31,9 +31,19 @@ function injectPunctuation(words: string[], rng: () => number, difficulty: Diffi
   const result: string[] = [];
   const punctuationRate = difficulty === 'easy' ? 0.08 : difficulty === 'hard' ? 0.2 : 0.12;
   const sentenceEndRate = difficulty === 'hard' ? 0.15 : 0.1;
+  const quoteStartRate = difficulty === 'easy' ? 0.03 : difficulty === 'hard' ? 0.08 : 0.05;
+  let inQuote = false;
+  let quoteCloseAt = -1;
 
   for (let i = 0; i < words.length; i += 1) {
     let token = words[i];
+
+    if (!inQuote && i < words.length - 2 && rng() < quoteStartRate) {
+      inQuote = true;
+      quoteCloseAt = Math.min(words.length - 1, i + 1 + Math.floor(rng() * 4));
+      token = `"${token}`;
+    }
+
     const sentenceEnd = i < words.length - 1 && rng() < sentenceEndRate;
     const shouldPunctuate = rng() < punctuationRate && !sentenceEnd;
 
@@ -47,7 +57,17 @@ function injectPunctuation(words: string[], rng: () => number, difficulty: Diffi
       token = `${token}.`;
     }
 
+    if (inQuote && i === quoteCloseAt) {
+      token = `${token}"`;
+      inQuote = false;
+      quoteCloseAt = -1;
+    }
+
     result.push(token);
+  }
+
+  if (inQuote && result.length > 0) {
+    result[result.length - 1] = `${result[result.length - 1]}"`;
   }
 
   return result.join(' ');

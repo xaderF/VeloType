@@ -237,6 +237,11 @@ export function HomeScreen({
                   Rank: <span className="text-accent">{rankDisplay}</span>
                 </div>
               )}
+              {!rankDisplay && (
+                <div className="text-xs text-lobby-text-muted">
+                  Rank: <span className="text-accent">UNRANKED</span>
+                </div>
+              )}
               {rating != null && (
                 <div className="text-xs text-lobby-text-muted font-mono">
                   Rating: {rating}
