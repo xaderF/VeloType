@@ -220,7 +220,7 @@ async function createMatch(a: QueueEntry, b: QueueEntry) {
     mode: 'time' as const,
     limit: 30,
     difficulty: 'medium' as const,
-    length: 240,
+    length: 1500,
     includePunctuation: false,
     maxRounds: 15,
     prepSeconds: PREP_SECONDS,

@@ -1,7 +1,7 @@
 // TypingDisplay: Displays the text to be typed. Used in TypingArena.
 // Depends on: cn util.
 // Props: text, typed, currentIndex, className.
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -11,6 +11,7 @@ interface CharCellProps {
   char: string;
   status: 'pending' | 'correct' | 'error';
   isCurrent: boolean;
+  currentCharRef?: (element: HTMLSpanElement | null) => void;
 }
 
 const STATUS_CLASS: Record<CharCellProps['status'], string> = {
@@ -19,19 +20,11 @@ const STATUS_CLASS: Record<CharCellProps['status'], string> = {
   error: 'text-typing-error',
 };
 
-const CharCell = memo(function CharCell({ char, status, isCurrent }: CharCellProps) {
-  const ref = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (isCurrent) {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-    }
-  }, [isCurrent]);
-
+const CharCell = memo(function CharCell({ char, status, isCurrent, currentCharRef }: CharCellProps) {
   return (
     <span className="relative inline-block">
       <span
-        ref={isCurrent ? ref : undefined}
+        ref={isCurrent ? currentCharRef : undefined}
         className={cn(STATUS_CLASS[status], 'transition-colors duration-75')}
       >
         {char === ' ' ? '\u00A0' : char}
@@ -53,6 +46,7 @@ interface TypingDisplayProps {
   /** Override font size classes (defaults to 'text-2xl md:text-3xl') */
   textSize?: string;
   className?: string;
+  lineCount?: number;
 }
 
 export const TypingDisplay = memo(function TypingDisplay({
@@ -61,31 +55,103 @@ export const TypingDisplay = memo(function TypingDisplay({
   currentIndex,
   textSize,
   className,
+  lineCount = 3,
 }: TypingDisplayProps) {
-  // Pre-compute a flat status array so word rendering is pure.
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const currentCharRef = useRef<HTMLSpanElement | null>(null);
+  const [lineHeightPx, setLineHeightPx] = useState<number | null>(null);
+  const [translateY, setTranslateY] = useState(0);
+  const setCurrentCharRef = useCallback((element: HTMLSpanElement | null) => {
+    currentCharRef.current = element;
+  }, []);
+
+  const { windowStart, windowText } = useMemo(() => {
+    const LOOK_BEHIND = 240;
+    const LOOK_AHEAD = 900;
+    const safeIndex = Math.max(0, Math.min(currentIndex, Math.max(0, text.length - 1)));
+
+    let start = Math.max(0, safeIndex - LOOK_BEHIND);
+    let end = Math.min(text.length, currentIndex + LOOK_AHEAD);
+
+    const prevSpace = text.lastIndexOf(' ', start);
+    if (prevSpace >= 0) start = prevSpace + 1;
+
+    const nextSpace = text.indexOf(' ', end);
+    if (nextSpace >= 0) end = nextSpace;
+
+    if (end <= start) end = Math.min(text.length, start + 1);
+
+    return {
+      windowStart: start,
+      windowText: text.slice(start, end),
+    };
+  }, [currentIndex, text]);
+
+  // Pre-compute status for only the currently rendered window.
   const statuses = useMemo(() => {
-    const out = new Array<CharCellProps['status']>(text.length);
-    for (let i = 0; i < text.length; i++) {
-      if (i >= typed.length) {
+    const out = new Array<CharCellProps['status']>(windowText.length);
+    for (let i = 0; i < windowText.length; i += 1) {
+      const globalIndex = windowStart + i;
+      if (globalIndex >= typed.length) {
         out[i] = 'pending';
-      } else if (typed[i] === text[i]) {
+      } else if (typed[globalIndex] === text[globalIndex]) {
         out[i] = 'correct';
       } else {
         out[i] = 'error';
       }
     }
     return out;
-  }, [text, typed]);
+  }, [text, typed, windowStart, windowText]);
 
-  // Split into words once (text never changes mid-render).
-  const words = useMemo(() => text.split(/(\s+)/), [text]);
+  // Split the rendered window into words once.
+  const words = useMemo(() => windowText.split(/(\s+)/), [windowText]);
 
-  let charIndex = 0;
+  useEffect(() => {
+    const measureLineHeight = () => {
+      const target = innerRef.current ?? viewportRef.current;
+      if (!target) return;
+
+      const styles = window.getComputedStyle(target);
+      const parsedLineHeight = Number.parseFloat(styles.lineHeight);
+      if (Number.isFinite(parsedLineHeight)) {
+        setLineHeightPx(parsedLineHeight);
+        return;
+      }
+
+      const parsedFontSize = Number.parseFloat(styles.fontSize);
+      if (Number.isFinite(parsedFontSize)) {
+        setLineHeightPx(parsedFontSize * 1.625);
+      }
+    };
+
+    measureLineHeight();
+    window.addEventListener('resize', measureLineHeight);
+    return () => window.removeEventListener('resize', measureLineHeight);
+  }, [textSize]);
+
+  useEffect(() => {
+    const current = currentCharRef.current;
+    if (!current) {
+      if (currentIndex === 0) setTranslateY(0);
+      return;
+    }
+
+    const lineHeight = lineHeightPx ?? (current.getBoundingClientRect().height * 1.6);
+    const nextTranslateY = Math.max(0, current.offsetTop - lineHeight);
+    setTranslateY(nextTranslateY);
+  }, [currentIndex, lineHeightPx, windowStart, windowText.length]);
+
+  const viewportHeight = lineHeightPx
+    ? `${lineHeightPx * Math.max(1, lineCount)}px`
+    : `${4.875 * Math.max(1, lineCount / 3)}em`;
+
+  let charIndex = windowStart;
 
   return (
     <div
       className={cn(
-        'relative font-mono leading-relaxed select-none break-words whitespace-pre-wrap overflow-hidden',
+        'relative font-mono leading-relaxed select-none',
         textSize ?? 'text-2xl md:text-3xl',
         className,
       )}
@@ -93,25 +159,39 @@ export const TypingDisplay = memo(function TypingDisplay({
       aria-label="Typing area — type the displayed text"
       aria-roledescription="typing test"
     >
-      {words.map((word, wIdx) => {
-        const startIdx = charIndex;
-        charIndex += word.length;
-        return (
-          <span key={wIdx} className="inline-block">
-            {word.split('').map((char, cIdx) => {
-              const idx = startIdx + cIdx;
-              return (
-                <CharCell
-                  key={cIdx}
-                  char={char}
-                  status={statuses[idx]}
-                  isCurrent={idx === currentIndex}
-                />
-              );
-            })}
-          </span>
-        );
-      })}
+      <div
+        ref={viewportRef}
+        className="overflow-hidden"
+        style={{ height: viewportHeight }}
+      >
+        <div
+          ref={innerRef}
+          className="break-words whitespace-pre-wrap transition-transform duration-100 ease-linear"
+          style={{ transform: `translateY(-${translateY}px)` }}
+        >
+          {words.map((word, wIdx) => {
+            const startIdx = charIndex;
+            charIndex += word.length;
+            return (
+              <span key={`${windowStart}-${wIdx}`} className="inline-block">
+                {word.split('').map((char, cIdx) => {
+                  const idx = startIdx + cIdx;
+                  const localIdx = idx - windowStart;
+                  return (
+                    <CharCell
+                      key={idx}
+                      char={char}
+                      status={statuses[localIdx]}
+                      isCurrent={idx === currentIndex}
+                      currentCharRef={setCurrentCharRef}
+                    />
+                  );
+                })}
+              </span>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 });

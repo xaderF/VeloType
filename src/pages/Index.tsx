@@ -41,7 +41,7 @@ function AuthPanel({ onClose, auth }: { onClose?: () => void; auth: AuthPanelAut
   const [email, setEmail] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [staySignedIn, setStaySignedIn] = useState(true);
+  const [staySignedIn, setStaySignedIn] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -609,8 +609,11 @@ const Index = () => {
   const buildPracticeText = useCallback(
     (includePunctuation: boolean, limit: 0 | 15 | 30 | 60 | 120) => {
       const seed = generateMatchSeed();
+      const targetLength = limit === 0
+        ? 30_000
+        : Math.max(1200, Math.min(9000, limit * 40));
       return getSeededText(seed, {
-        length: limit === 0 ? 4000 : 200,
+        length: targetLength,
         includePunctuation,
       });
     },

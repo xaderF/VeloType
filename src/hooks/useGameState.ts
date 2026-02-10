@@ -331,8 +331,9 @@ export function useGameState({
   // Get current round text
   const getCurrentText = useCallback((): string => {
     if (!match) return '';
+    const targetLength = Math.max(1200, Math.min(9000, match.roundTimeSeconds * 40));
     return getSeededText(`${match.textSeed}-${match.currentRound}`, {
-      length: Math.max(200, match.roundTimeSeconds * 8),
+      length: targetLength,
       difficulty: 'medium',
       includePunctuation: match.textSettings.punctuation,
     });
