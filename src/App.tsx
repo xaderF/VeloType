@@ -68,7 +68,7 @@ const App = () => (
           <CookieConsent />
           <div
             aria-label="app-version"
-            className="pointer-events-none fixed bottom-3 right-3 z-[100] select-none text-xs font-mono text-muted-foreground/75"
+            className="pointer-events-none fixed bottom-3 left-3 z-[100] select-none text-xs font-mono text-muted-foreground/75"
           >
             {APP_VERSION}
           </div>
