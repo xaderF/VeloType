@@ -292,11 +292,11 @@ export default function Profile() {
                         onClick={async () => {
                           setDeleting(true);
                           setDeleteError(null);
-                          const ok = await deleteAccount(deletePassword);
-                          if (ok) {
+                          const result = await deleteAccount(deletePassword);
+                          if (result.ok) {
                             navigate('/');
                           } else {
-                            setDeleteError('Incorrect password');
+                            setDeleteError(result.error ?? 'Failed to delete account');
                           }
                           setDeleting(false);
                         }}

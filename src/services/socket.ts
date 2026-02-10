@@ -17,6 +17,9 @@ export interface MatchFoundPayload {
     length: number;
     includePunctuation: boolean;
     maxRounds?: number;
+    roundWins?: Record<string, number>;
+    overtimeActive?: boolean;
+    drawWindowOpen?: boolean;
     prepSeconds?: number;
     countdownSeconds?: number;
     breakSeconds?: number;
@@ -35,6 +38,9 @@ export interface JoinedConfigPayload {
   startAt: number;
   roundNumber?: number;
   maxRounds?: number;
+  roundWins?: Record<string, number>;
+  overtimeActive?: boolean;
+  drawWindowOpen?: boolean;
   breakSeconds?: number;
   countdownSeconds?: number;
   prepSeconds?: number;
@@ -77,6 +83,9 @@ export interface RoundEndPayload {
   maxRounds: number;
   winner: string;
   players: Record<string, RoundEndPlayerPayload>;
+  roundWins: Record<string, number>;
+  overtimeActive: boolean;
+  drawWindowOpen: boolean;
   breakSeconds: number;
   countdownSeconds: number;
   nextRoundStartAt: number | null;
@@ -119,6 +128,9 @@ export interface MatchStateRecoveryPayload {
   roundNumber?: number;
   roundStartAt?: number;
   maxRounds?: number;
+  roundWins?: Record<string, number>;
+  overtimeActive?: boolean;
+  drawWindowOpen?: boolean;
   hp?: Record<string, number>;
 }
 
@@ -481,6 +493,14 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
     return false;
   }
 
+  function sendDrawVote(vote: 'draw' | 'continue'): boolean {
+    if (ws.readyState === WebSocket.OPEN && hasJoinAck) {
+      ws.send(JSON.stringify({ type: 'draw_vote', vote }));
+      return true;
+    }
+    return false;
+  }
+
   function close() {
     intentionalClose = true;
     hasJoinAck = false;
@@ -510,6 +530,7 @@ export function createLiveMatchSocket(handlers: LiveMatchSocketHandlers) {
     sendProgress,
     sendResult,
     sendForfeit,
+    sendDrawVote,
     close,
     getLatency,
     getLatencyTracker,

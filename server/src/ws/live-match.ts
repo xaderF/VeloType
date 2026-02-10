@@ -94,7 +94,12 @@ interface RuntimeMatchState {
   breakSeconds: number;
   countdownSeconds: number;
   playerHp: Map<string, number>;
+  roundWins: Map<string, number>;
   aggregates: Map<string, PlayerAggregate>;
+  overtimeActive: boolean;
+  drawWindowOpen: boolean;
+  drawAccepted: boolean;
+  drawVotes: Map<string, 'draw' | 'continue'>;
   winnerUserId: string | null;
   forfeitedUserId: string | null;
 }
@@ -137,9 +142,13 @@ const disconnectedPlayers = new Map<string, DisconnectedPlayer>(); // keyed by `
 
 const RECONNECT_GRACE_MS = 30_000;
 const SUBMIT_GRACE_MS = 5_000;
-const DEFAULT_MAX_ROUNDS = 15;
+const DEFAULT_MAX_ROUNDS = 5;
 const DEFAULT_BREAK_SECONDS = 7;
 const DEFAULT_COUNTDOWN_SECONDS = 3;
+const REGULATION_WIN_TARGET = 3;
+const WIN_BY_MARGIN = 2;
+const OVERTIME_TRIGGER_WINS = 2;
+const REGULATION_ROUNDS = 4;
 const POINTS_PER_TIER = 100;
 const MAX_MMR_TIER_INDEX = 20; // Velocity 3
 const OVERPERFORM_GAMES_WINDOW = 10;
@@ -249,7 +258,12 @@ function getOrCreateRuntimeState(matchId: string): RuntimeMatchState | null {
     breakSeconds: config.breakSeconds ?? DEFAULT_BREAK_SECONDS,
     countdownSeconds: config.countdownSeconds ?? DEFAULT_COUNTDOWN_SECONDS,
     playerHp: new Map(config.playerIds.map((id) => [id, 100])),
+    roundWins: new Map(config.playerIds.map((id) => [id, 0])),
     aggregates: new Map(config.playerIds.map((id) => [id, createInitialAggregate()])),
+    overtimeActive: false,
+    drawWindowOpen: false,
+    drawAccepted: false,
+    drawVotes: new Map(),
     winnerUserId: null,
     forfeitedUserId: null,
   };
@@ -442,7 +456,8 @@ function buildRoundStats(
       matchTimeLimitMs,
     );
 
-    const maxPlausibleChars = Math.ceil((matchTimeLimitMs / 1000) * 20);
+    // Allow high-end typing speeds while still guarding against impossible payload spikes.
+    const maxPlausibleChars = Math.ceil((matchTimeLimitMs / 1000) * 45);
     const typedClamped = sub.typed.length > maxPlausibleChars
       ? sub.typed.slice(0, maxPlausibleChars)
       : sub.typed;
@@ -534,7 +549,10 @@ async function finaliseMatch(matchId: string) {
   let p1Result: 'win' | 'loss' | 'draw';
   let p2Result: 'win' | 'loss' | 'draw';
 
-  if (state.winnerUserId === p1) {
+  if (state.drawAccepted) {
+    p1Result = 'draw';
+    p2Result = 'draw';
+  } else if (state.winnerUserId === p1) {
     p1Result = 'win';
     p2Result = 'loss';
   } else if (state.winnerUserId === p2) {
@@ -810,6 +828,10 @@ function applyRoundDamageAndWinner(
   baseStats: Map<string, Omit<PlayerRoundStats, 'damageDealt' | 'damageTaken' | 'hp'>>,
 ): {
   roundPayloadPlayers: Record<string, PlayerRoundStats>;
+  roundWinner: string | 'draw';
+  roundWins: Record<string, number>;
+  overtimeActive: boolean;
+  drawWindowOpen: boolean;
   matchEnded: boolean;
   nextRoundStartAt: number | null;
 } {
@@ -841,15 +863,40 @@ function applyRoundDamageAndWinner(
     p2Agg.damageTakenTotal += p1Damage;
   }
 
-  const roundsDone = state.currentRound;
-  const reachedRoundLimit = roundsDone >= state.maxRounds;
-  const knockout = p1Hp <= 0 || p2Hp <= 0;
-  const matchEnded = knockout || reachedRoundLimit;
+  let roundWinner: string | 'draw' = 'draw';
+  if (p1Damage > p2Damage) {
+    roundWinner = p1;
+    state.roundWins.set(p1, (state.roundWins.get(p1) ?? 0) + 1);
+  } else if (p2Damage > p1Damage) {
+    roundWinner = p2;
+    state.roundWins.set(p2, (state.roundWins.get(p2) ?? 0) + 1);
+  }
+
+  const p1Wins = state.roundWins.get(p1) ?? 0;
+  const p2Wins = state.roundWins.get(p2) ?? 0;
+
+  if (!state.overtimeActive && p1Wins >= OVERTIME_TRIGGER_WINS && p2Wins >= OVERTIME_TRIGGER_WINS) {
+    state.overtimeActive = true;
+  }
+
+  const hasWinnerByRounds =
+    (p1Wins >= REGULATION_WIN_TARGET || p2Wins >= REGULATION_WIN_TARGET) &&
+    Math.abs(p1Wins - p2Wins) >= WIN_BY_MARGIN;
+  const matchEnded = hasWinnerByRounds;
 
   if (matchEnded) {
-    if (p1Hp > p2Hp) state.winnerUserId = p1;
-    else if (p2Hp > p1Hp) state.winnerUserId = p2;
-    else state.winnerUserId = null;
+    state.winnerUserId = p1Wins > p2Wins ? p1 : p2;
+    state.drawWindowOpen = false;
+    state.drawVotes.clear();
+  } else {
+    const roundsDone = state.currentRound;
+    const drawWindowOpen =
+      state.overtimeActive &&
+      p1Wins === p2Wins &&
+      roundsDone > REGULATION_ROUNDS &&
+      (roundsDone - REGULATION_ROUNDS) % 2 === 0;
+    state.drawWindowOpen = drawWindowOpen;
+    state.drawVotes.clear();
   }
 
   const nextRoundStartAt = matchEnded
@@ -871,7 +918,18 @@ function applyRoundDamageAndWinner(
     },
   };
 
-  return { roundPayloadPlayers, matchEnded, nextRoundStartAt };
+  return {
+    roundPayloadPlayers,
+    roundWinner,
+    roundWins: {
+      [p1]: state.roundWins.get(p1) ?? 0,
+      [p2]: state.roundWins.get(p2) ?? 0,
+    },
+    overtimeActive: state.overtimeActive,
+    drawWindowOpen: state.drawWindowOpen,
+    matchEnded,
+    nextRoundStartAt,
+  };
 }
 
 async function resolveCurrentRound(matchId: string) {
@@ -881,27 +939,29 @@ async function resolveCurrentRound(matchId: string) {
   if (!config || !state || !submissions || state.winnerUserId) return;
 
   const baseStats = buildRoundStats(matchId, config, state, submissions);
-  const { roundPayloadPlayers, matchEnded, nextRoundStartAt } = applyRoundDamageAndWinner(config, state, baseStats);
+  const {
+    roundPayloadPlayers,
+    roundWinner,
+    roundWins,
+    overtimeActive,
+    drawWindowOpen,
+    matchEnded,
+    nextRoundStartAt,
+  } = applyRoundDamageAndWinner(config, state, baseStats);
 
   const room = rooms.get(matchId);
   if (room) {
-    const [p1, p2] = getPlayerIds(config);
-    const winner = matchEnded
-      ? state.winnerUserId
-      : (roundPayloadPlayers[p1].damageDealt > roundPayloadPlayers[p2].damageDealt
-        ? p1
-        : roundPayloadPlayers[p2].damageDealt > roundPayloadPlayers[p1].damageDealt
-          ? p2
-          : 'draw');
-
     room.forEach((sock) => {
       send(sock, {
         type: 'round_end',
         matchId,
         roundNumber: state.currentRound,
         maxRounds: state.maxRounds,
-        winner,
+        winner: roundWinner,
         players: roundPayloadPlayers,
+        roundWins,
+        overtimeActive,
+        drawWindowOpen,
         breakSeconds: state.breakSeconds,
         countdownSeconds: state.countdownSeconds,
         nextRoundStartAt,
@@ -946,6 +1006,11 @@ const resultSchema = z.object({
 
 const forfeitSchema = z.object({
   type: z.literal('forfeit'),
+});
+
+const drawVoteSchema = z.object({
+  type: z.literal('draw_vote'),
+  vote: z.enum(['draw', 'continue']),
 });
 
 // ---------------------------------------------------------------------------
@@ -1041,6 +1106,9 @@ export async function liveMatchWs(app: FastifyInstance) {
               startAt: runtime.roundStartAt,
               roundNumber: runtime.currentRound,
               maxRounds: runtime.maxRounds,
+              roundWins: Object.fromEntries(runtime.roundWins.entries()),
+              overtimeActive: runtime.overtimeActive,
+              drawWindowOpen: runtime.drawWindowOpen,
               breakSeconds: runtime.breakSeconds,
               countdownSeconds: runtime.countdownSeconds,
               prepSeconds: config.prepSeconds ?? 10,
@@ -1086,6 +1154,9 @@ export async function liveMatchWs(app: FastifyInstance) {
               roundNumber: runtime.currentRound,
               roundStartAt: runtime.roundStartAt,
               maxRounds: runtime.maxRounds,
+              roundWins: Object.fromEntries(runtime.roundWins.entries()),
+              overtimeActive: runtime.overtimeActive,
+              drawWindowOpen: runtime.drawWindowOpen,
               hp,
             });
           }
@@ -1228,6 +1299,36 @@ export async function liveMatchWs(app: FastifyInstance) {
           state.forfeitedUserId = context.userId;
 
           await finaliseMatch(context.matchId);
+          return;
+        }
+
+        if (message.type === 'draw_vote') {
+          const payload = drawVoteSchema.safeParse(message);
+          if (!payload.success) {
+            send(socket, { type: 'error', message: 'invalid draw vote payload' });
+            return;
+          }
+
+          const config = activeMatchConfigs.get(context.matchId);
+          const state = getOrCreateRuntimeState(context.matchId);
+          if (!config || !state || !state.drawWindowOpen || state.winnerUserId) return;
+
+          state.drawVotes.set(context.userId, payload.data.vote);
+
+          if (payload.data.vote === 'continue') {
+            state.drawWindowOpen = false;
+            state.drawVotes.clear();
+            return;
+          }
+
+          const allPlayersVotedDraw = config.playerIds.every((id) => state.drawVotes.get(id) === 'draw');
+          if (allPlayersVotedDraw) {
+            state.drawAccepted = true;
+            state.drawWindowOpen = false;
+            state.drawVotes.clear();
+            state.winnerUserId = null;
+            await finaliseMatch(context.matchId);
+          }
           return;
         }
 

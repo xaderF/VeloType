@@ -23,6 +23,16 @@ interface TypingArenaProps {
   focusMode?: boolean;
   /** Timer starts on first keystroke instead of immediately (used by free type) */
   startOnFirstKeystroke?: boolean;
+  /** Keep appending text as users approach the end. */
+  infiniteText?: boolean;
+  /** Optional custom chunk generator for infinite text mode. */
+  infiniteChunkGenerator?: (context: {
+    chunkIndex: number;
+    currentTarget: string;
+    currentCursor: number;
+  }) => string;
+  /** Increment to force-finish and emit stats. */
+  forceFinishSignal?: number;
   className?: string;
 }
 
@@ -36,6 +46,9 @@ export function TypingArena({
   onProgressUpdate,
   focusMode = false,
   startOnFirstKeystroke: startOnFirstKeystrokeProp,
+  infiniteText = false,
+  infiniteChunkGenerator,
+  forceFinishSignal,
   className,
 }: TypingArenaProps) {
   const {
@@ -52,6 +65,9 @@ export function TypingArena({
     onComplete,
     timeLimit,
     startOnFirstKeystroke: startOnFirstKeystrokeProp ?? focusMode,
+    infiniteText,
+    infiniteChunkGenerator,
+    forceFinishSignal,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -155,7 +171,7 @@ export function TypingArena({
                 {timeRemaining}s
               </div>
               <div className="text-xs text-muted-foreground">
-                {state.cursor} / {state.target.length} chars
+                {infiniteText ? `${state.cursor} chars` : `${state.cursor} / ${state.target.length} chars`}
               </div>
             </div>
           </div>
@@ -180,7 +196,7 @@ export function TypingArena({
         />
 
         {/* Progress bar — hidden in focus mode */}
-        {!focusMode && (
+        {!focusMode && !infiniteText && (
           <div className="mt-6 h-1 bg-secondary rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-primary"

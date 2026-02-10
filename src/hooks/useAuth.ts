@@ -22,6 +22,11 @@ interface AuthState {
   user: AuthUser | null;
 }
 
+export interface DeleteAccountResult {
+  ok: boolean;
+  error?: string;
+}
+
 function loadPersistedAuth(): AuthState {
   try {
     const persistedMode = localStorage.getItem(STORAGE_MODE_KEY);
@@ -180,23 +185,65 @@ export function useAuth() {
     setAuth({ token: null, user: null });
   }, []);
 
-  const deleteAccount = useCallback(async (password?: string) => {
-    if (!auth.token) return false;
+  const deleteAccount = useCallback(async (password?: string): Promise<DeleteAccountResult> => {
+    if (!auth.token) return { ok: false, error: 'Unauthorized' };
+
+    const payload = password ? { password } : {};
+
+    const sendDelete = async () => fetch(`${API_BASE}/profile/delete`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const sendLegacyDelete = async () => fetch(`${API_BASE}/profile`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
     try {
-      const res = await fetch(`${API_BASE}/profile`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: password ? JSON.stringify({ password }) : undefined,
-      });
-      if (!res.ok) return false;
+      let res = await sendDelete();
+      if (res.status === 404 || res.status === 405) {
+        res = await sendLegacyDelete();
+      }
+
+      let data: unknown = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          clearAuth();
+          setAuth({ token: null, user: null });
+          return { ok: false, error: 'Session expired. Please log in again.' };
+        }
+
+        const serverError =
+          typeof data === 'object' &&
+          data !== null &&
+          'error' in data &&
+          typeof (data as { error: unknown }).error === 'string'
+            ? (data as { error: string }).error
+            : null;
+
+        return { ok: false, error: serverError ?? 'Failed to delete account.' };
+      }
+
       clearAuth();
       setAuth({ token: null, user: null });
-      return true;
+      return { ok: true };
     } catch {
-      return false;
+      return { ok: false, error: 'Network error' };
     }
   }, [auth.token]);
 

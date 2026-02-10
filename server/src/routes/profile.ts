@@ -287,10 +287,10 @@ export async function profileRoutes(app: FastifyInstance) {
   // Requires password re-entry for security.
   // -------------------------------------------------------------------------
   const deleteBodySchema = z.object({
-    password: z.string().min(1),
+    password: z.string().min(1).optional(),
   }).optional();
 
-  app.delete('/profile', async (request: FastifyRequest, reply: FastifyReply) => {
+  const handleDeleteProfile = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = getBearerToken(request.headers.authorization);
     const authUser = token ? verifyAuthToken(token) : null;
     if (!authUser) {
@@ -324,5 +324,9 @@ export async function profileRoutes(app: FastifyInstance) {
     if (token) revokeToken(token);
 
     return reply.status(200).send({ success: true, message: 'Account and all associated data have been permanently deleted.' });
-  });
+  };
+
+  app.delete('/profile', handleDeleteProfile);
+  // Also support POST for clients/proxies that mishandle DELETE request bodies.
+  app.post('/profile/delete', handleDeleteProfile);
 }

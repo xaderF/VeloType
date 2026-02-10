@@ -16,6 +16,9 @@ interface RoundEndOverlayProps {
   drawOffered?: boolean;
   drawAccepted?: boolean;
   onOfferDraw?: () => void;
+  drawVoteSelection?: 'draw' | 'continue' | null;
+  onVoteDraw?: () => void;
+  onVoteContinue?: () => void;
   breakSeconds?: number;
   playerName?: string;
   opponentName?: string;
@@ -32,6 +35,9 @@ export function RoundEndOverlay({
   drawOffered = false,
   drawAccepted = false,
   onOfferDraw,
+  drawVoteSelection = null,
+  onVoteDraw,
+  onVoteContinue,
   breakSeconds = 7,
   playerName = 'You',
   opponentName = 'Opponent',
@@ -156,22 +162,51 @@ export function RoundEndOverlay({
               {drawAvailable && (
                 <div className="flex flex-col items-center gap-3">
                   <div className="text-sm text-muted-foreground">
-                    Overtime draw option unlocked (round 10+). Both players must confirm.
+                    Overtime draw vote: choose draw or continue.
                   </div>
-                  <button
-                    className={cn(
-                      "px-4 py-2 rounded-md border text-sm font-medium transition-colors",
-                      drawAccepted
-                        ? "bg-secondary text-foreground"
-                        : drawOffered
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent hover:text-accent-foreground"
-                    )}
-                    disabled={drawAccepted}
-                    onClick={onOfferDraw}
-                  >
-                    {drawAccepted ? 'Draw confirmed' : drawOffered ? 'Waiting for opponent...' : 'Offer draw'}
-                  </button>
+                  {(onVoteDraw || onVoteContinue) ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        className={cn(
+                          'px-4 py-2 rounded-md border text-sm font-medium transition-colors',
+                          drawVoteSelection === 'draw'
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'hover:bg-accent hover:text-accent-foreground',
+                        )}
+                        disabled={drawAccepted || drawVoteSelection !== null}
+                        onClick={onVoteDraw}
+                      >
+                        {drawVoteSelection === 'draw' ? 'Draw voted' : 'Draw'}
+                      </button>
+                      <button
+                        className={cn(
+                          'px-4 py-2 rounded-md border text-sm font-medium transition-colors',
+                          drawVoteSelection === 'continue'
+                            ? 'bg-secondary text-foreground border-border'
+                            : 'hover:bg-accent hover:text-accent-foreground',
+                        )}
+                        disabled={drawAccepted || drawVoteSelection !== null}
+                        onClick={onVoteContinue}
+                      >
+                        {drawVoteSelection === 'continue' ? 'Continue voted' : 'Continue'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className={cn(
+                        "px-4 py-2 rounded-md border text-sm font-medium transition-colors",
+                        drawAccepted
+                          ? "bg-secondary text-foreground"
+                          : drawOffered
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-accent hover:text-accent-foreground"
+                      )}
+                      disabled={drawAccepted}
+                      onClick={onOfferDraw}
+                    >
+                      {drawAccepted ? 'Draw confirmed' : drawOffered ? 'Waiting for opponent...' : 'Offer draw'}
+                    </button>
+                  )}
                 </div>
               )}
             </motion.div>

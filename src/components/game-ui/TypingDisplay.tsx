@@ -22,9 +22,8 @@ const STATUS_CLASS: Record<CharCellProps['status'], string> = {
 
 const CharCell = memo(function CharCell({ char, status, isCurrent, currentCharRef }: CharCellProps) {
   return (
-    <span className="relative inline-block">
+    <span ref={isCurrent ? currentCharRef : undefined} className="relative inline-block">
       <span
-        ref={isCurrent ? currentCharRef : undefined}
         className={cn(STATUS_CLASS[status], 'transition-colors duration-75')}
       >
         {char === ' ' ? '\u00A0' : char}
@@ -132,13 +131,21 @@ export const TypingDisplay = memo(function TypingDisplay({
 
   useEffect(() => {
     const current = currentCharRef.current;
+    const inner = innerRef.current;
     if (!current) {
       if (currentIndex === 0) setTranslateY(0);
       return;
     }
+    if (!inner) return;
 
-    const lineHeight = lineHeightPx ?? (current.getBoundingClientRect().height * 1.6);
-    const nextTranslateY = Math.max(0, current.offsetTop - lineHeight);
+    // Shift as soon as the caret enters the next wrapped line:
+    // line 2 becomes visible as line 1, line 3 becomes line 2, etc.
+    const currentRect = current.getBoundingClientRect();
+    const innerRect = inner.getBoundingClientRect();
+    const localTop = Math.max(0, currentRect.top - innerRect.top);
+    const nextTranslateY = lineHeightPx && Number.isFinite(lineHeightPx) && lineHeightPx > 0
+      ? Math.floor((localTop + lineHeightPx * 0.1) / lineHeightPx) * lineHeightPx
+      : localTop;
     setTranslateY(nextTranslateY);
   }, [currentIndex, lineHeightPx, windowStart, windowText.length]);
 

@@ -6,6 +6,7 @@ import {
   createTypingState,
   typingReducer,
   buildMetrics,
+  generateText,
 } from '@/game/engine';
 import { computeWpm, computeRawWpm, countCorrectChars } from '@/game/engine/metrics';
 
@@ -17,6 +18,26 @@ interface UseTypingEngineProps {
   timeLimit?: number; // in seconds
   /** When true, the timer won't start until the first keystroke (MonkeyType-style) */
   startOnFirstKeystroke?: boolean;
+  /** Keep appending text as the cursor approaches the end. */
+  infiniteText?: boolean;
+  /** Optional custom chunk generator for infinite text mode. */
+  infiniteChunkGenerator?: (context: {
+    chunkIndex: number;
+    currentTarget: string;
+    currentCursor: number;
+  }) => string;
+  /** Increment this value to force-finish the current run and emit results. */
+  forceFinishSignal?: number;
+}
+
+const STREAM_APPEND_THRESHOLD = 220;
+const STREAM_CHUNK_LENGTH = 520;
+
+function normalizeChunkForAppend(chunk: string, currentTarget: string): string {
+  const normalized = chunk.trim();
+  if (!normalized) return '';
+  if (!currentTarget) return normalized;
+  return currentTarget.endsWith(' ') ? normalized : ` ${normalized}`;
 }
 
 export function useTypingEngine({
@@ -26,11 +47,16 @@ export function useTypingEngine({
   onComplete,
   timeLimit = 30,
   startOnFirstKeystroke = false,
+  infiniteText = false,
+  infiniteChunkGenerator,
+  forceFinishSignal,
 }: UseTypingEngineProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasReported = useRef(false);
   const wpmHistoryRef = useRef<WpmHistoryPoint[]>([]);
   const lastHistoryLen = useRef(0);
+  const nextChunkIndexRef = useRef(1);
+  const lastForceFinishSignalRef = useRef(forceFinishSignal);
 
   const [state, dispatch] = useReducer(
     typingReducer,
@@ -46,6 +72,7 @@ export function useTypingEngine({
     hasReported.current = false;
     wpmHistoryRef.current = [];
     lastHistoryLen.current = 0;
+    nextChunkIndexRef.current = 1;
     dispatch({
       type: 'RESET',
       payload: {
@@ -54,6 +81,39 @@ export function useTypingEngine({
       },
     });
   }, [text, mode, timeLimit]);
+
+  // Force-finish hook (used by endless free-type "Stop" action).
+  useEffect(() => {
+    if (forceFinishSignal === undefined) return;
+    if (forceFinishSignal === lastForceFinishSignalRef.current) return;
+    lastForceFinishSignalRef.current = forceFinishSignal;
+    if (state.status === 'finished') return;
+    dispatch({ type: 'FINISH', payload: { nowMs: Date.now() } });
+  }, [forceFinishSignal, state.status]);
+
+  // Infinite stream: append more text before the cursor reaches the end.
+  useEffect(() => {
+    if (!infiniteText || state.status === 'finished') return;
+    const remaining = state.target.length - state.cursor;
+    if (remaining > STREAM_APPEND_THRESHOLD) return;
+
+    const chunkIndex = nextChunkIndexRef.current;
+    const chunk = infiniteChunkGenerator?.({
+      chunkIndex,
+      currentTarget: state.target,
+      currentCursor: state.cursor,
+    }) ?? generateText({
+      seed: `stream-${chunkIndex}-${state.target.length}`,
+      length: STREAM_CHUNK_LENGTH,
+      difficulty: 'medium',
+      includePunctuation: false,
+    });
+
+    const appendText = normalizeChunkForAppend(chunk, state.target);
+    if (!appendText) return;
+    dispatch({ type: 'APPEND_TARGET', payload: { text: appendText } });
+    nextChunkIndexRef.current += 1;
+  }, [infiniteChunkGenerator, infiniteText, state.cursor, state.status, state.target]);
 
   // Tick interval for time-based mode and consistency sampling
   useEffect(() => {

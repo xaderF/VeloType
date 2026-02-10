@@ -16,6 +16,11 @@ const OPPONENT_NAMES = [
   'BlitzTyper',
 ];
 
+const WIN_TARGET = 3;
+const WIN_BY_MARGIN = 2;
+const OVERTIME_TRIGGER_WINS = 2;
+const REGULATION_ROUNDS = 4;
+
 interface UseGameStateProps {
   initialRating?: number;
   username?: string;
@@ -38,6 +43,7 @@ export function useGameState({
   const [playerRating, setPlayerRating] = useState(initialRating);
   const [drawOffered, setDrawOffered] = useState(false);
   const [drawAccepted, setDrawAccepted] = useState(false);
+  const [drawWindowOpen, setDrawWindowOpen] = useState(false);
   const [practiceSettings, setPracticeSettings] = useState<PracticeSettings>({
     punctuation: false,
     timeLimitSeconds: 30,
@@ -106,7 +112,7 @@ export function useGameState({
         player: { ...player, hp: 100, maxHp: 100 },
         opponent,
         currentRound: 1,
-        maxRounds: 15,
+        maxRounds: 5,
         roundResults: [],
         roundTimeSeconds: practiceSettings.timeLimitSeconds,
         status: 'waiting',
@@ -119,6 +125,7 @@ export function useGameState({
 
       setDrawOffered(false);
       setDrawAccepted(false);
+      setDrawWindowOpen(false);
 
       setPhase('match_found');
 
@@ -143,6 +150,9 @@ export function useGameState({
     matchFoundTimerRef.current = null;
     setPhase('home');
     setQueueTime(0);
+    setDrawOffered(false);
+    setDrawAccepted(false);
+    setDrawWindowOpen(false);
   }, []);
 
   // Handle countdown
@@ -230,26 +240,32 @@ export function useGameState({
     const newPlayerHp = Math.max(0, match.player.hp - damageTaken);
     const newOpponentHp = Math.max(0, match.opponent.hp - damageDealt);
     
-    // Check for match end
+    // Check for match end (first to 3, win by 2)
     const roundResults = [...match.roundResults, roundResult];
-    const maxRounds = match.maxRounds || 15;
-    const tieAvailable = roundResults.length >= 10;
+    const playerWins = roundResults.filter((r) => r.winner === 'player').length;
+    const opponentWins = roundResults.filter((r) => r.winner === 'opponent').length;
+    const winDiff = Math.abs(playerWins - opponentWins);
 
     const matchEnded =
-      newPlayerHp <= 0 ||
-      newOpponentHp <= 0 ||
-      roundResults.length >= maxRounds ||
-      (tieAvailable && drawAccepted);
+      (playerWins >= WIN_TARGET || opponentWins >= WIN_TARGET) &&
+      winDiff >= WIN_BY_MARGIN;
 
-    let matchWinner: 'player' | 'opponent' | 'draw' | null = null;
-    if (newPlayerHp <= 0) matchWinner = 'opponent';
-    else if (newOpponentHp <= 0) matchWinner = 'player';
-    else if (roundResults.length >= maxRounds) {
-      if (newPlayerHp > newOpponentHp) matchWinner = 'player';
-      else if (newOpponentHp > newPlayerHp) matchWinner = 'opponent';
-      else matchWinner = 'draw';
-    } else if (tieAvailable && drawAccepted) {
-      matchWinner = 'draw';
+    const matchWinner: 'player' | 'opponent' | 'draw' | null = matchEnded
+      ? (playerWins > opponentWins ? 'player' : 'opponent')
+      : null;
+
+    const overtimeActive = playerWins >= OVERTIME_TRIGGER_WINS && opponentWins >= OVERTIME_TRIGGER_WINS;
+    const nextDrawWindowOpen =
+      !matchEnded &&
+      overtimeActive &&
+      playerWins === opponentWins &&
+      roundResults.length > REGULATION_ROUNDS &&
+      (roundResults.length - REGULATION_ROUNDS) % 2 === 0;
+
+    setDrawWindowOpen(nextDrawWindowOpen);
+    if (!nextDrawWindowOpen) {
+      setDrawOffered(false);
+      setDrawAccepted(false);
     }
 
     setMatch((prev) => {
@@ -259,6 +275,7 @@ export function useGameState({
         player: { ...prev.player, hp: newPlayerHp },
         opponent: { ...prev.opponent, hp: newOpponentHp },
         currentRound: matchEnded ? prev.currentRound : prev.currentRound + 1,
+        maxRounds: Math.max(5, matchEnded ? prev.currentRound : prev.currentRound + 1),
         roundResults,
         status: matchEnded ? 'match_end' : 'round_end',
         winner: matchWinner,
@@ -293,18 +310,33 @@ export function useGameState({
         roundAdvanceTimerRef.current = null;
       }, breakMs);
     }
-  }, [match, playerRating, simulateOpponentStats, drawAccepted]);
+  }, [match, playerRating, simulateOpponentStats]);
 
-  // Offer draw after round 10; simulate opponent acceptance
+  // Overtime draw vote — available every 2 tied overtime rounds.
   const offerDraw = useCallback(() => {
-    if (!match || match.currentRound < 10 || match.status === 'match_end') return;
+    if (!match || !drawWindowOpen || match.status === 'match_end') return;
     setDrawOffered(true);
     if (drawConfirmTimerRef.current) clearTimeout(drawConfirmTimerRef.current);
     if (drawResolveTimerRef.current) clearTimeout(drawResolveTimerRef.current);
 
-    // Simulate opponent confirming draw shortly after
+    // Simulate opponent vote shortly after: sometimes accepts, sometimes continues.
     drawConfirmTimerRef.current = setTimeout(() => {
+      const opponentAcceptsDraw = Math.random() < 0.5;
+      if (!opponentAcceptsDraw) {
+        setDrawOffered(false);
+        setDrawAccepted(false);
+        setDrawWindowOpen(false);
+        drawConfirmTimerRef.current = null;
+        return;
+      }
+
       setDrawAccepted(true);
+      setDrawWindowOpen(false);
+      if (roundAdvanceTimerRef.current) {
+        clearTimeout(roundAdvanceTimerRef.current);
+        roundAdvanceTimerRef.current = null;
+      }
+
       setMatch((prev) => {
         if (!prev) return null;
         return {
@@ -313,20 +345,23 @@ export function useGameState({
           winner: 'draw',
         };
       });
-      setPhase('round_end');
+
       drawResolveTimerRef.current = setTimeout(() => {
-        const eloChange = calculateEloChange(
-          playerRating,
-          match.opponent.rating,
-          'draw'
-        );
+        const eloChange = calculateEloChange(playerRating, match.opponent.rating, 'draw');
         setPlayerRating((prev) => prev + eloChange);
         setPhase('results');
         drawResolveTimerRef.current = null;
-      }, 2000);
+      }, 1200);
       drawConfirmTimerRef.current = null;
     }, 800);
-  }, [match, playerRating]);
+  }, [drawWindowOpen, match, playerRating]);
+
+  const continueAfterDrawPrompt = useCallback(() => {
+    if (!drawWindowOpen) return;
+    setDrawOffered(false);
+    setDrawAccepted(false);
+    setDrawWindowOpen(false);
+  }, [drawWindowOpen]);
 
   // Get current round text
   const getCurrentText = useCallback((): string => {
@@ -375,6 +410,9 @@ export function useGameState({
     setPhase('home');
     setQueueTime(0);
     setCountdown(3);
+    setDrawOffered(false);
+    setDrawAccepted(false);
+    setDrawWindowOpen(false);
   }, []);
 
   // Cleanup on unmount
@@ -410,9 +448,11 @@ export function useGameState({
     cancelQueue,
     handleRoundComplete,
     offerDraw,
+    continueAfterDrawPrompt,
     getCurrentText,
     playAgain,
     getEloChange,
+    drawWindowOpen,
     drawOffered,
     drawAccepted,
     practiceSettings,

@@ -38,5 +38,6 @@ export type TypingAction =
   | { type: 'TYPE_CHAR'; payload: { char: string; nowMs: number } }
   | { type: 'BACKSPACE'; payload: { nowMs: number } }
   | { type: 'TICK'; payload: { nowMs: number } }
+  | { type: 'APPEND_TARGET'; payload: { text: string } }
   | { type: 'FINISH'; payload: { nowMs: number } }
   | { type: 'RESET'; payload?: { target?: string; options?: TypingOptions } };

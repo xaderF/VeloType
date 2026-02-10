@@ -88,6 +88,14 @@ export function typingReducer(state: TypingState, action: TypingAction): TypingS
       return createTypingState(target, options);
     }
 
+    case 'APPEND_TARGET': {
+      if (!action.payload.text) return state;
+      return {
+        ...state,
+        target: `${state.target}${action.payload.text}`,
+      };
+    }
+
     case 'TYPE_CHAR': {
       if (state.status === 'finished') return state;
       if (action.payload.char.length !== 1) return state;

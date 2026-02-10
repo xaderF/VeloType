@@ -25,6 +25,8 @@ interface PlayScreenProps {
   onForfeit?: () => void;
   /** If true, show a confirmation dialog before forfeiting */
   confirmForfeit?: boolean;
+  /** Keep appending text as the cursor approaches the end. */
+  infiniteText?: boolean;
 }
 
 export function PlayScreen({
@@ -40,6 +42,7 @@ export function PlayScreen({
   isTypingActive = true,
   onForfeit,
   confirmForfeit = false,
+  infiniteText = false,
 }: PlayScreenProps) {
   const [showForfeitDialog, setShowForfeitDialog] = useState(false);
 
@@ -136,6 +139,7 @@ export function PlayScreen({
             onProgressUpdate={onProgressUpdate}
             focusMode={isTypingActive}
             startOnFirstKeystroke={false}
+            infiniteText={infiniteText}
           />
         </div>
 

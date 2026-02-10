@@ -113,6 +113,8 @@ export function useOnlineMatch(authToken: string | null) {
   const [opponentFinished, setOpponentFinished] = useState(false);
   const [matchResult, setMatchResult] = useState<OnlineMatchResult | null>(null);
   const [match, setMatch] = useState<MatchState | null>(null);
+  const [drawVoteWindowOpen, setDrawVoteWindowOpen] = useState(false);
+  const [drawVoteSelection, setDrawVoteSelection] = useState<'draw' | 'continue' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [latency, setLatency] = useState<LatencyStats | null>(null);
@@ -393,11 +395,14 @@ export function useOnlineMatch(authToken: string | null) {
 
       const nextRound = payload.nextRoundStartAt ? payload.roundNumber + 1 : payload.roundNumber;
       const existingOpponent = prev.opponent;
+      const displayMaxRounds = payload.nextRoundStartAt
+        ? Math.max(prev.maxRounds, nextRound)
+        : Math.max(prev.maxRounds, payload.roundNumber);
 
       return {
         ...prev,
         currentRound: nextRound,
-        maxRounds: payload.maxRounds,
+        maxRounds: displayMaxRounds,
         roundResults: [...prev.roundResults, roundResult],
         status: payload.nextRoundStartAt ? 'round_end' : 'match_end',
         player: {
@@ -423,6 +428,8 @@ export function useOnlineMatch(authToken: string | null) {
     stopProgressReporting();
 
     setPhase('round_end');
+    setDrawVoteWindowOpen(payload.drawWindowOpen);
+    setDrawVoteSelection(null);
     setOpponentFinished(false);
     setOpponentProgress(null);
 
@@ -449,6 +456,8 @@ export function useOnlineMatch(authToken: string | null) {
     setMatchResult(null);
     setOpponentProgress(null);
     setOpponentFinished(false);
+    setDrawVoteWindowOpen(false);
+    setDrawVoteSelection(null);
     localRoundStatsRef.current.clear();
     matchFoundStartedAtRef.current = null;
 
@@ -519,7 +528,7 @@ export function useOnlineMatch(authToken: string | null) {
             maxHp: 100,
           },
           currentRound: 1,
-          maxRounds: data.config.maxRounds ?? 15,
+          maxRounds: data.config.maxRounds ?? 5,
           roundResults: [],
           roundTimeSeconds: data.config.limit,
           status: 'waiting',
@@ -545,6 +554,8 @@ export function useOnlineMatch(authToken: string | null) {
                   maxRounds: joinedCfg.maxRounds ?? prev.maxRounds,
                 };
               });
+              setDrawVoteWindowOpen(joinedCfg.drawWindowOpen ?? false);
+              setDrawVoteSelection(null);
 
               if (joinedCfg.roundNumber && seedRef.current && matchConfigRef.current) {
                 setTargetText(buildRoundText(seedRef.current, joinedCfg.roundNumber, matchConfigRef.current));
@@ -601,6 +612,8 @@ export function useOnlineMatch(authToken: string | null) {
               return;
             }
 
+            setDrawVoteWindowOpen(false);
+            setDrawVoteSelection(null);
             setPhase('complete');
             liveSocketRef.current?.close();
             liveSocketRef.current = null;
@@ -648,6 +661,8 @@ export function useOnlineMatch(authToken: string | null) {
                 };
               });
             }
+            setDrawVoteWindowOpen(recovery.drawWindowOpen ?? false);
+            setDrawVoteSelection(null);
 
             if (phaseBeforeDisconnectRef.current === 'playing' && !progressIntervalRef.current) {
               startProgressReporting();
@@ -757,6 +772,8 @@ export function useOnlineMatch(authToken: string | null) {
     setOpponentFinished(false);
     setMatchResult(null);
     setMatch(null);
+    setDrawVoteWindowOpen(false);
+    setDrawVoteSelection(null);
     setError(null);
     setLatency(null);
     setReconnectAttempt(0);
@@ -801,6 +818,16 @@ export function useOnlineMatch(authToken: string | null) {
     setPhase('waiting_opponent');
   }, [resetMatch, stopProgressReporting, stopRoundClock, stopTransitionTimers]);
 
+  const submitDrawVote = useCallback((vote: 'draw' | 'continue') => {
+    const sent = liveSocketRef.current?.sendDrawVote(vote) ?? false;
+    if (!sent) return false;
+    setDrawVoteSelection(vote);
+    if (vote === 'continue') {
+      setDrawVoteWindowOpen(false);
+    }
+    return true;
+  }, []);
+
   return {
     phase,
     queueTime,
@@ -820,6 +847,8 @@ export function useOnlineMatch(authToken: string | null) {
     opponentFinished,
     matchResult,
     match,
+    drawVoteWindowOpen,
+    drawVoteSelection,
     error,
     latency,
     reconnectAttempt,
@@ -829,6 +858,7 @@ export function useOnlineMatch(authToken: string | null) {
     updateTypingState,
     registerLocalRoundStats,
     submitResult,
+    submitDrawVote,
     resetMatch,
     forfeitMatch,
   };

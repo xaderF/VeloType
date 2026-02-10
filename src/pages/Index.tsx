@@ -546,6 +546,7 @@ const Index = () => {
   const [practicePunctuation, setPracticePunctuation] = useState(false);
   const [practiceKey, setPracticeKey] = useState(0); // forces TypingArena remount
   const [practiceStarted, setPracticeStarted] = useState(false); // true once first key pressed
+  const [practiceStopSignal, setPracticeStopSignal] = useState(0);
 
   // Offline (simulated) game state
   const offline = useGameState({
@@ -627,6 +628,7 @@ const Index = () => {
     setPracticeResults(null);
     setPracticePhase('typing');
     setPracticeStarted(false);
+    setPracticeStopSignal(0);
     setPracticeKey((k) => k + 1);
     setShowModeSelect(false);
     setPlayMode('practice');
@@ -655,6 +657,7 @@ const Index = () => {
     setPracticeResults(null);
     setPracticePhase('typing');
     setPracticeStarted(false);
+    setPracticeStopSignal(0);
     setPracticeKey((k) => k + 1);
   }, [buildPracticeText, practicePunctuation, practiceTimeLimit]);
 
@@ -736,16 +739,17 @@ const Index = () => {
   const lastRoundResult = offline.match?.roundResults[offline.match.roundResults.length - 1] || null;
   const onlineLastRoundResult = online.match?.roundResults[online.match.roundResults.length - 1] || null;
 
-  // Forfeit handler for offline (1v AI) — immediately go home
+  // Forfeit handler for offline (1v AI) — return to play mode selector
   const handleOfflineForfeit = useCallback(() => {
     offline.playAgain();
     setPlayMode('offline');
+    setShowModeSelect(true);
   }, [offline]);
 
-  // Forfeit handler for online (competitive) — reset match and go home
+  // Forfeit handler for online (competitive) — leave match and reopen play mode selector
   const handleOnlineForfeit = useCallback(() => {
     online.forfeitMatch();
-    setPlayMode('offline');
+    setShowModeSelect(true);
   }, [online]);
 
   const getAggregateStats = (): RoundStats => {
@@ -902,6 +906,7 @@ const Index = () => {
               isTypingActive={online.phase === 'playing'}
               onForfeit={handleOnlineForfeit}
               confirmForfeit
+              infiniteText={false}
             />
 
             <CountdownOverlay
@@ -912,6 +917,10 @@ const Index = () => {
             <RoundEndOverlay
               isVisible={online.phase === 'round_end'}
               roundResult={onlineLastRoundResult}
+              drawAvailable={online.drawVoteWindowOpen}
+              drawVoteSelection={online.drawVoteSelection}
+              onVoteDraw={() => { void online.submitDrawVote('draw'); }}
+              onVoteContinue={() => { void online.submitDrawVote('continue'); }}
               breakSeconds={Math.max(0, online.breakSeconds)}
               playerName={online.match.player.username}
               opponentName={online.match.opponent.username}
@@ -991,7 +1000,11 @@ const Index = () => {
                   Your match will resume once reconnected
                 </div>
                 <button
-                  onClick={() => { online.resetMatch(); setPlayMode('offline'); }}
+                  onClick={() => {
+                    online.resetMatch();
+                    setPlayMode('offline');
+                    setShowModeSelect(true);
+                  }}
                   className="mt-2 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
                 >
                   Leave Match
@@ -1071,13 +1084,27 @@ const Index = () => {
               setPracticePhase('typing');
               setPracticeResults(null);
               setPracticeStarted(false);
+              setPracticeStopSignal(0);
               setPlayMode('offline');
+              setShowModeSelect(true);
             }}
             className="px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/20 transition-colors"
           >
             ✕ Exit
           </button>
         </div>
+
+        {isPracticeEndless && practicePhase === 'typing' && (
+          <div className="absolute top-4 right-4 z-30">
+            <button
+              onClick={() => setPracticeStopSignal((s) => s + 1)}
+              disabled={!practiceStarted}
+              className="px-4 py-2 rounded-lg bg-primary/15 border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Stop & Show Results
+            </button>
+          </div>
+        )}
 
         {/* Header — hidden during active typing for focus */}
         <AnimatePresence>
@@ -1153,6 +1180,8 @@ const Index = () => {
                     startOnFirstKeystroke={!isPracticeEndless}
                     onComplete={handlePracticeComplete}
                     focusMode
+                    infiniteText
+                    forceFinishSignal={practiceStopSignal}
                   />
                 </motion.div>
               )}
@@ -1339,6 +1368,7 @@ const Index = () => {
           isTypingActive={offline.phase === 'playing'}
           onForfeit={handleOfflineForfeit}
           confirmForfeit
+          infiniteText
         />
       )}
 
@@ -1369,10 +1399,11 @@ const Index = () => {
       <RoundEndOverlay
         isVisible={offline.phase === 'round_end'}
         roundResult={lastRoundResult}
-        drawAvailable={Boolean(offline.match && offline.match.roundResults.length >= 10)}
-        drawOffered={offline.drawOffered}
+        drawAvailable={offline.drawWindowOpen}
+        drawVoteSelection={offline.drawOffered ? 'draw' : null}
         drawAccepted={offline.drawAccepted}
-        onOfferDraw={offline.offerDraw}
+        onVoteDraw={offline.offerDraw}
+        onVoteContinue={offline.continueAfterDrawPrompt}
         breakSeconds={7}
         playerName={offline.match?.player.username}
         opponentName={offline.match?.opponent.username}
