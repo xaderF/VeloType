@@ -1,6 +1,6 @@
 # VeloXType
 
-[![Play Here](https://img.shields.io/badge/Play-VeloXType-blue?style=for-the-badge&logo=firebase)](https://veloxtype.vercel.app)
+[![Play Here](https://img.shields.io/badge/Play-VeloXType(v1.1)-blue?style=for-the-badge&logo=firebase)](https://veloxtype.vercel.app)
 
 <p align="left">
   <img alt="React" height="24" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" />
