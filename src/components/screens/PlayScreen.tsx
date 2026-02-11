@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MatchHUD } from '@/components/game-ui/MatchHUD';
 import { TypingArena } from '@/components/game-ui/TypingArena';
@@ -29,6 +29,8 @@ interface PlayScreenProps {
   infiniteText?: boolean;
   /** Optional display override for player rank badge (e.g. null => UNRANKED badge). */
   playerRatingDisplay?: number | null;
+  /** Optional display override for opponent rank badge (e.g. null => UNRANKED badge). */
+  opponentRatingDisplay?: number | null;
   /** Show typing options bar above the arena. */
   showTypingOptions?: boolean;
   /** Optional authoritative overtime flag (online/server-driven). */
@@ -50,13 +52,13 @@ export function PlayScreen({
   confirmForfeit = false,
   infiniteText = false,
   playerRatingDisplay,
+  opponentRatingDisplay,
   showTypingOptions = true,
   overtimeActiveOverride,
 }: PlayScreenProps) {
   const [showForfeitDialog, setShowForfeitDialog] = useState(false);
-  const [isActivelyTyping, setIsActivelyTyping] = useState(false);
-  const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const focusModeActive = isTypingActive && isActivelyTyping;
+  const resolvedPlayerRating = playerRatingDisplay === undefined ? match.player.rating : playerRatingDisplay;
+  const resolvedOpponentRating = opponentRatingDisplay === undefined ? match.opponent.rating : opponentRatingDisplay;
 
   const playerWins = match.roundResults.filter((r) => r.winner === 'player').length;
   const opponentWins = match.roundResults.filter((r) => r.winner === 'opponent').length;
@@ -65,34 +67,6 @@ export function PlayScreen({
   const overtimeRoundIndex = Math.max(1, match.currentRound - 6);
   const displayRound = overtimeActive ? ((overtimeRoundIndex - 1) % 2) + 1 : Math.min(match.currentRound, 6);
   const displayMaxRounds = overtimeActive ? 2 : 6;
-
-  const markTypingActivity = useCallback(() => {
-    setIsActivelyTyping(true);
-    if (typingIdleTimerRef.current) {
-      clearTimeout(typingIdleTimerRef.current);
-    }
-    typingIdleTimerRef.current = setTimeout(() => {
-      setIsActivelyTyping(false);
-      typingIdleTimerRef.current = null;
-    }, 220);
-  }, []);
-
-  useEffect(() => {
-    if (!isTypingActive) {
-      setIsActivelyTyping(false);
-      if (typingIdleTimerRef.current) {
-        clearTimeout(typingIdleTimerRef.current);
-        typingIdleTimerRef.current = null;
-      }
-    }
-  }, [isTypingActive, currentText, match.currentRound]);
-
-  useEffect(() => () => {
-    if (typingIdleTimerRef.current) {
-      clearTimeout(typingIdleTimerRef.current);
-      typingIdleTimerRef.current = null;
-    }
-  }, []);
 
   const handleForfeitClick = () => {
     if (confirmForfeit) {
@@ -108,9 +82,7 @@ export function PlayScreen({
       <div
         className={cn(
           'absolute inset-0 pointer-events-none transition-all duration-300',
-          focusModeActive
-            ? 'bg-lobby-bg/65 backdrop-blur-2xl'
-            : 'bg-lobby-bg/45 backdrop-blur-[2px]',
+          'bg-lobby-bg/45 backdrop-blur-[2px]',
         )}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-primary/8 via-transparent to-lobby-bg/40 pointer-events-none" />
@@ -138,27 +110,22 @@ export function PlayScreen({
       />
 
       <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
-        {/* Keep layout fixed; only fade UI in/out for focus mode. */}
-        <div className={cn("transition-opacity duration-100", focusModeActive && "opacity-0 pointer-events-none")}>
-          <MatchHUD
-            player={{ ...match.player, rating: playerRatingDisplay ?? match.player.rating }}
-            opponent={match.opponent}
-            currentRound={displayRound}
-            maxRounds={displayMaxRounds}
-            overtimeActive={overtimeActive}
-            timeRemaining={timeRemaining}
-            playerDamage={playerDamage}
-            opponentDamage={opponentDamage}
-          />
-        </div>
+        <MatchHUD
+          player={{ ...match.player, rating: resolvedPlayerRating }}
+          opponent={{ ...match.opponent, rating: resolvedOpponentRating }}
+          currentRound={displayRound}
+          maxRounds={displayMaxRounds}
+          overtimeActive={overtimeActive}
+          timeRemaining={timeRemaining}
+          playerDamage={playerDamage}
+          opponentDamage={opponentDamage}
+        />
 
         {showTypingOptions && (
-          <div className={cn("transition-opacity duration-100", focusModeActive && "opacity-0 pointer-events-none")}>
-            <TypingOptionsBar
-              punctuationEnabled={punctuationEnabled}
-              timeLimit={match.roundTimeSeconds}
-            />
-          </div>
+          <TypingOptionsBar
+            punctuationEnabled={punctuationEnabled}
+            timeLimit={match.roundTimeSeconds}
+          />
         )}
 
         {/* Typing Arena */}
@@ -170,14 +137,12 @@ export function PlayScreen({
             onComplete={onRoundComplete}
             onCompleteRaw={onRoundCompleteRaw}
             onProgressUpdate={onProgressUpdate}
-            onInputActivity={markTypingActivity}
-            focusMode={focusModeActive}
             startOnFirstKeystroke={false}
             infiniteText={infiniteText}
           />
         </div>
 
-        <div className={cn("text-center text-muted-foreground text-sm transition-opacity duration-100", focusModeActive && "opacity-0 pointer-events-none")}>
+        <div className="text-center text-muted-foreground text-sm">
           {overtimeActive
             ? `Round ${displayRound}/${displayMaxRounds} • Overtime • Type fast, type accurate`
             : `Round ${displayRound}/${displayMaxRounds} • Type fast, type accurate`}

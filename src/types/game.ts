@@ -6,7 +6,7 @@ import { Rank, RoundStats } from '@/utils/scoring';
 export interface Player {
   id: string;
   username: string;
-  rating: number;
+  rating: number | null;
   rank: Rank;
   hp: number;
   maxHp: number;

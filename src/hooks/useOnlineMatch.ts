@@ -495,10 +495,10 @@ export function useOnlineMatch(authToken: string | null) {
 
         const playerId = myId ?? 'me';
         const playerUsername = myEntry?.username ?? 'Player';
-        const playerRating = myEntry?.rating ?? 0;
+        const playerRating = myEntry?.rating ?? null;
         const oppId = opponentEntry?.[0] ?? 'opponent';
         const oppUsername = opponentEntry?.[1].username ?? 'Opponent';
-        const oppRating = opponentEntry?.[1].rating ?? 0;
+        const oppRating = opponentEntry?.[1].rating ?? null;
 
         setMatch({
           id: data.matchId,
@@ -506,7 +506,7 @@ export function useOnlineMatch(authToken: string | null) {
             id: playerId,
             username: playerUsername,
             rating: playerRating,
-            rank: getRankFromRating(playerRating).rank,
+            rank: getRankFromRating(playerRating ?? 0).rank,
             hp: 100,
             maxHp: 100,
           },
@@ -514,7 +514,7 @@ export function useOnlineMatch(authToken: string | null) {
             id: oppId,
             username: oppUsername,
             rating: oppRating,
-            rank: getRankFromRating(oppRating).rank,
+            rank: getRankFromRating(oppRating ?? 0).rank,
             hp: 100,
             maxHp: 100,
           },

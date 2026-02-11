@@ -1114,6 +1114,8 @@ const Index = () => {
               onForfeit={handleOnlineForfeit}
               confirmForfeit
               infiniteText={false}
+              playerRatingDisplay={auth.user?.rating ?? null}
+              opponentRatingDisplay={online.opponent?.rating ?? null}
               showTypingOptions={false}
               overtimeActiveOverride={online.overtimeActive}
             />
